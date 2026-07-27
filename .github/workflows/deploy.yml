@@ -47,11 +47,10 @@ jobs:
       - name: Derle
         run: npm run build
 
-      # enablement: depoda Pages kapaliysa bu adim kendisi acar,
-      # boylece Settings'ten elle ayar yapmaya gerek kalmaz.
+      # Not: Depoda Pages'in bir kez elle acilmasi gerekir
+      # (Settings > Pages > Source: GitHub Actions).
+      # enablement: true denendi, GITHUB_TOKEN'a bu yetki verilmiyor (403).
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
