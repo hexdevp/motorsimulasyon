@@ -12,7 +12,7 @@ echo.
 git rev-parse --is-inside-work-tree >nul 2>&1
 if errorlevel 1 (
   echo  Bu klasor bir git deposu degil.
-  echo  Once "GitHubaYukle.bat" dosyasini calistir.
+  echo  Once "Yukle.bat" dosyasini calistir.
   pause
   exit /b 1
 )
@@ -20,7 +20,7 @@ if errorlevel 1 (
 git remote get-url origin >nul 2>&1
 if errorlevel 1 (
   echo  Uzak depo bagli degil.
-  echo  Once "GitHubaYukle.bat" dosyasini calistir.
+  echo  Once "Yukle.bat" dosyasini calistir.
   pause
   exit /b 1
 )

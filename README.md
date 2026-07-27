@@ -3,6 +3,8 @@
 Krank-açısı çözünürlüklü 0D içten yanmalı motor simülatörü. Tarayıcıda çalışır,
 kurulum gerektirmez, iki dillidir (TR/EN).
 
+**Canlı sürüm: https://hexdevp.github.io/motorsimulasyon/**
+
 ---
 
 ## Çalıştırma
@@ -48,9 +50,14 @@ push'ta: bağımlılıkları kurar, **135 testi çalıştırır**, derler ve yay
 Testler başarısız olursa yayın yapılmaz — bozuk bir fizik modeli siteye
 çıkamaz.
 
-**Terminal bilmiyorsan:** klasördeki `GitHubaYukle.bat` dosyasına çift tıkla.
-Kullanıcı adını, ismini ve e-postanı sorar, gerisini kendi yapar. Sonraki
-güncellemeler için `GuncelleVeYayinla.bat` yeterli.
+Pages'in depoda bir kez elle açılması gerekir: **Settings > Pages > Source:
+GitHub Actions**. Bu adım otomatikleştirilemiyor — GitHub, bir deponun Pages
+sitesini ilk kez oluşturma yetkisini workflow token'ına vermez (403 döner).
+Açıldıktan sonra her push otomatik yayınlanır.
+
+**Terminal bilmiyorsan:** güncellemeler için klasördeki
+`GuncelleVeYayinla.bat` dosyasına çift tıkla; ne değiştiğini sorar,
+gerisini kendi yapar.
 
 **Terminalden yapmak istersen:**
 
