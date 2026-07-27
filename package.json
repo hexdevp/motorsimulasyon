@@ -1,0 +1,29 @@
+{
+  "name": "motor-simulasyon",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Krank-acisi cozunurluklu 0D ice yanmali motor simulatoru",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "npm run test:physics && npm run test:drive",
+    "test:physics": "tsx test/physics.test.ts",
+    "test:drive": "tsx test/driver.ts && tsx test/starter.ts && tsx test/phases.ts && tsx test/thermal.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.23.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vite-plugin-singlefile": "^2.1.0"
+  }
+}

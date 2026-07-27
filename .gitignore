@@ -1,0 +1,25 @@
+# Bagimliliklar
+node_modules/
+
+# Derleme ciktisi — CI tarafindan uretilir, depoya konmaz
+dist/
+
+# Editor ve isletim sistemi
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Gunlukler
+npm-debug.log*
+yarn-error.log*
+*.log
+
+# Ortam degiskenleri (bu projede kullanilmiyor ama kaza olmasin)
+.env
+.env.local
+.env.*.local
+
+# Vercel yerel onbellegi
+.vercel

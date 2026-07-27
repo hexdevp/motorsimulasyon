@@ -1,0 +1,64 @@
+# GitHub Pages'e otomatik yayin
+#
+# Her main push'unda: bagimliliklari kurar, fizik testlerini calistirir,
+# derler ve yayinlar. Testler basarisiz olursa yayin YAPILMAZ — boylece
+# bozuk bir fizik modeli siteye cikmaz.
+
+name: Yayinla (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  # Sekmeden elle de tetiklenebilsin
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Ayni anda tek yayin; yenisi gelirse eskisini beklemeden devam et
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Bagimliliklari kur
+        run: npm ci
+
+      - name: Fizik testleri
+        run: |
+          npx tsx test/physics.test.ts
+          npx tsx test/driver.ts
+          npx tsx test/starter.ts
+          npx tsx test/phases.ts
+          npx tsx test/thermal.ts
+
+      - name: Derle
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
