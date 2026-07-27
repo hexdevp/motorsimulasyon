@@ -331,22 +331,36 @@ export function DrivePanel({ cfg, lang }: { cfg: EngineConfig; lang: Lang }) {
       while (history.current.length && history.current[0].t < cutoff) history.current.shift();
 
       // ---- Ses ----
+      //
+      // try/catch SART: bu blok requestAnimationFrame dongusunun icinde.
+      // Buradan cikan bir istisna, asagidaki rAF cagrisina hic
+      // ulasilmamasina ve simulasyonun KALICI olarak donmasina yol acar.
+      // Ses ikincil bir ozellik; hicbir kosulda surusu durdurmamali.
+      // Hata surekli tekrarlamasin diye ses tamamen devre disi birakilir.
       if (audio.current) {
         const point = lookupPoint(map, r.rpm);
-        audio.current.update({
-          rpm: r.rpm,
-          throttle: driver.current.throttle,
-          load: clamp(Math.abs(r.engineTorque) / maxTorque, 0, 1),
-          running: r.state.running,
-          cranking: driver.current.starter === 'cranking',
-          crankRpm: driver.current.crankRpm,
-          boost: (point.map - cfg.ambient.pressure) / 1e5,
-          wheelSlip: r.slipSpeed,
-          brake: driver.current.brake + driver.current.handbrake * 0.7,
-          speedKmh: r.speedKmh,
-          clutchSlip: r.clutchSlipSpeed,
-          revLimiter: r.revLimiter,
-        });
+        try {
+          audio.current.update({
+            rpm: r.rpm,
+            throttle: driver.current.throttle,
+            load: clamp(Math.abs(r.engineTorque) / maxTorque, 0, 1),
+            running: r.state.running,
+            cranking: driver.current.starter === 'cranking',
+            crankRpm: driver.current.crankRpm,
+            boost: (point.map - cfg.ambient.pressure) / 1e5,
+            wheelSlip: r.slipSpeed,
+            brake: driver.current.brake + driver.current.handbrake * 0.7,
+            speedKmh: r.speedKmh,
+            clutchSlip: r.clutchSlipSpeed,
+            revLimiter: r.revLimiter,
+          });
+        } catch (err) {
+          console.error('Ses devre disi birakildi (surus etkilenmedi):', err);
+          // dispose'un kendisi de bozuk bir dugume dokunabilir; onemli
+          // olan referansi birakmak, temizligin kusursuz olmasi degil.
+          try { audio.current.dispose(); } catch { /* zaten bozuk */ }
+          audio.current = null;
+        }
       }
 
       paint(r);

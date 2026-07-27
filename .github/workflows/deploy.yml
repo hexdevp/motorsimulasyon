@@ -43,6 +43,7 @@ jobs:
           npx tsx test/starter.ts
           npx tsx test/phases.ts
           npx tsx test/thermal.ts
+          npx tsx test/audio.ts
 
       - name: Derle
         run: npm run build

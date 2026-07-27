@@ -1,32 +1,80 @@
+<div align="center">
+
 # Motor Simülasyonu
 
-Krank-açısı çözünürlüklü 0D içten yanmalı motor simülatörü. Tarayıcıda çalışır,
-kurulum gerektirmez, iki dillidir (TR/EN).
+**Krank açısı çözünürlüklü içten yanmalı motor simülatörü — tarayıcıda.**
 
-**Canlı sürüm: https://hexdevp.github.io/motorsimulasyon/**
+### [▶ Canlı demo — hexdevp.github.io/motorsimulasyon](https://hexdevp.github.io/motorsimulasyon/)
+
+Kurulum yok, hesap yok, sunucu yok. Aç ve kullan.
+
+![Lisans](https://img.shields.io/badge/test-148%20ge%C3%A7iyor-brightgreen)
+![Fizik](https://img.shields.io/badge/%C3%A7%C3%B6z%C3%BCc%C3%BC-0D%20krank%20a%C3%A7%C4%B1s%C4%B1-blue)
+![Boyut](https://img.shields.io/badge/tek%20dosya-364%20KB-lightgrey)
+![Dil](https://img.shields.io/badge/dil-TR%20%2F%20EN-informational)
+
+</div>
 
 ---
 
-## Çalıştırma
+## Bu ne?
 
-**Hazır dosyayı açmak** (arkadaşına göndereceğin hâli):
+Çoğu "motor simülatörü" aslında bir **eğri uydurmadır**: birkaç parametre alır,
+hazır bir tork eğrisini ölçekler ve sonucu gösterir. Bu öyle değil.
 
-`MotorSimulasyonu.bat` dosyasına çift tıkla. Ya da doğrudan `dist/index.html`
-dosyasını tarayıcıda aç. Kurulum, sunucu veya internet gerekmez — her şey tek
-bir 256 KB'lık HTML dosyasının içindedir.
+Burada her çalışma noktası için termodinamik çevrim **720° boyunca 0.5°
+adımlarla** çözülür. Enerji korunumu her adımda entegre edilir; basınç,
+sıcaklık ve kütle bileşimi bunun sonucudur. Tork, o çevrimin altındaki alandan
+çıkar — tersi değil.
 
-**Kaynaktan derlemek:**
+Pratikte farkı şudur: **girmediğiniz hiçbir şey uydurulmaz.** "Yanma süresi"
+diye bir giriş kutusu yoktur, çünkü yanma süresi alev hızından türetilir. Alev
+hızı da karışım oranına, sıcaklığa, basınca ve türbülansa bağlıdır. Kam
+süresini uzattığınızda düşük devir torkunun neden düştüğünü model size
+*hesaplayarak* söyler.
+
+## Neler var
+
+- **12 hazır motor** — 2JZ-GTE, LS3, K20A, EJ257, B58, RB26DETT, Coyote, Barra,
+  EA888, Viper V10, Ferrari F140 V12, 4A-GE. Hepsinin ~60 parametresi
+  düzenlenebilir.
+- **Gerçek zamanlı sürüş** — motor bir aracın içinde. Debriyaj kayar ve ısınır,
+  lastik patinaj yapar, motor stall eder. Klavyeyle sürersiniz.
+- **Sentezlenmiş motor sesi** — kayıt değil, ateşleme frekansından üretiliyor.
+  Silindir sayısı, mimari ve hacim sesi değiştirir; V8 ile I4 farklı duyulur.
+- **Canlı 2D animasyon** — pistonlar, supaplar, alev cephesi. Uydurma değil,
+  çözücünün ürettiği izden sürülüyor.
+- **Kalibrasyon yazılımı gibi yakıt haritası** — tıkla-sürükle seçim, Excel'e
+  kopyala-yapıştır, ara değer hesabı, yumuşatma.
+- **Kök-neden teşhisi** — "vuruntu var" demez; vuruntuya hangi etkenin ne kadar
+  katkı yaptığını ayrıştırır.
+- **Ortam koşulları** — rakım, nem, sıcaklık. Denver'da (1600 m) LS3 gücünün
+  %20'sini kaybeder ve model bunu kendisi bulur.
+- **Türkçe / İngilizce** arayüz.
+
+---
+
+## Hızlı başlangıç
+
+**Sadece kullanmak istiyorsanız:**
+[hexdevp.github.io/motorsimulasyon](https://hexdevp.github.io/motorsimulasyon/)
+adresini açın. Hepsi bu.
+
+**Kaynaktan çalıştırmak:**
 
 ```bash
-npm install
+npm install && npm run dev
+```
+
+**Derlemek:**
+
+```bash
 npm run build
 ```
 
-**Geliştirme sunucusu:**
-
-```bash
-npm run dev
-```
+Çıktı `dist/index.html` — JavaScript, CSS ve tüm veri içine gömülmüş **tek bir
+dosya**. Harici istek yapmaz, internet olmadan çalışır, e-postayla
+gönderilebilir.
 
 **Testler:**
 
@@ -34,80 +82,38 @@ npm run dev
 npm test
 ```
 
----
-
-## Web'de yayınlama
-
-Uygulama **tamamen statiktir** — sunucu, veritabanı veya API yoktur.
-Derleme çıktısı her şeyi içine gömülmüş tek bir HTML dosyasıdır
-(~360 KB, gzip ~118 KB). Bu yüzden herhangi bir statik barındırmada
-çalışır ve çalışma zamanı maliyeti yoktur.
-
-### Seçenek A — GitHub Pages (tek hesap yeter)
-
-Depo `.github/workflows/deploy.yml` ile birlikte gelir. `main` dalına her
-push'ta: bağımlılıkları kurar, **135 testi çalıştırır**, derler ve yayınlar.
-Testler başarısız olursa yayın yapılmaz — bozuk bir fizik modeli siteye
-çıkamaz.
-
-Pages'in depoda bir kez elle açılması gerekir: **Settings > Pages > Source:
-GitHub Actions**. Bu adım otomatikleştirilemiyor — GitHub, bir deponun Pages
-sitesini ilk kez oluşturma yetkisini workflow token'ına vermez (403 döner).
-Açıldıktan sonra her push otomatik yayınlanır.
-
-**Terminal bilmiyorsan:** güncellemeler için klasördeki
-`GuncelleVeYayinla.bat` dosyasına çift tıkla; ne değiştiğini sorar,
-gerisini kendi yapar.
-
-**Terminalden yapmak istersen:**
-
-```bash
-git remote add origin https://github.com/KULLANICI/motorsimulasyon.git
-git push -u origin main
-```
-
-Her iki durumda da son adım: depoda **Settings → Pages → Source: GitHub
-Actions** seçmek. Adres: `https://KULLANICI.github.io/motorsimulasyon/`
-
-### Seçenek B — Vercel (daha hızlı CDN, otomatik önizleme)
-
-`vercel.json` hazırdır; Vercel projeyi Vite olarak tanır. GitHub deposunu
-Vercel'e bağlamak yeterlidir — her push otomatik yayınlanır, her dal için
-ayrı önizleme adresi üretilir.
-
-Adres: `https://motorsimulasyon.vercel.app` (veya özel alan adı)
-
-### Not
-
-Arayüz masaüstü için tasarlanmıştır: sürüş klavye ile kontrol edilir
-(W/S/C/Shift/E/Q/Space/R) ve paneller geniş ekrana göre yerleşir. Telefonda
-açılır ama sürüş sekmesi klavye gerektirir.
+> **Not:** Arayüz masaüstü içindir. Sürüş sekmesi klavye gerektirir ve paneller
+> geniş ekrana göre yerleşir. Telefonda açılır, ama sürüş bölümü kullanılamaz.
 
 ---
 
-## Ne yapıyor
+## Sekmeler
 
 | Sekme | İçerik |
 |---|---|
 | **Motor Kurulumu** | 12 hazır motor + ~60 parametrenin tamamı düzenlenebilir |
-| **Animasyon** | Canlı 2D silindir kesiti + çoklu silindir görünümü (aşağıda) |
-| **Güç & Tork** | RPM süpürmesi, tork/güç/VE/avans/basınç eğrileri, detay tablosu |
+| **Animasyon** | Canlı 2D silindir kesiti + çoklu silindir görünümü |
+| **Güç & Tork** | RPM süpürmesi; tork/güç/VE/avans/basınç eğrileri ve detay tablosu |
 | **Silindir İçi** | P-V diyagramı, basınç ve sıcaklık izi, ısı bırakma, supap kalkışı |
 | **Yakıt Haritası** | MAP × RPM ızgarası — darbe genişliği, VE, avans, lambda, doluluk |
 | **Teşhis** | Durum kontrolü, kök-neden analizi, enerji dengesi, sürtünme dökümü |
 | **Sürüş** | Araç içinde gerçek zamanlı sürüş — gösterge paneli ve aktarma şeması |
-| **Canlı Sim** | Gaz pedalı, atalet ile gerçek zamanlı devir, göstergeler, rev limiter |
+| **Canlı Sim** | Gaz pedalı, atalet ile gerçek zamanlı devir, rev limiter |
 | **Analiz Raporu** | Statik özellikler + devir tablosu + değerlendirme, Markdown çıktı |
 
-### Sürüş sekmesi
+### Sürüş
 
-Motor artık dinamometrede değil, bir aracın içinde. Her motorun eşleştiği bir
-araç var (2JZ → Supra, LS3 → Corvette, K20A → Civic Type R…) ve zincirin
-tamamı modelleniyor: motor → debriyaj → vites kutusu → şaft → diferansiyel →
-tekerlek → yol.
+Motor dinamometrede değil, bir aracın içinde. Her motorun eşleştiği bir araç var
+(2JZ → Supra, LS3 → Corvette, K20A → Civic Type R…) ve zincirin tamamı
+modelleniyor: motor → debriyaj → vites kutusu → şaft → diferansiyel → tekerlek
+→ yol.
 
-**Tuşlar:** `W` gaz · `S` fren · `Shift` debriyaj · `E` vites yukarı ·
-`Q` vites aşağı · `Space` el freni · `R` motoru çalıştır
+| Tuş | İşlev | | Tuş | İşlev |
+|---|---|---|---|---|
+| `W` | Gaz | | `E` | Vites yukarı |
+| `S` | Fren | | `Q` | Vites aşağı |
+| `Shift` | Debriyaj | | `Space` | El freni |
+| `C` | Yarım debriyaj | | `R` | Marş (basılı tut) |
 
 Pedallar ani değil kademeli hareket eder — debriyajı yavaş bırakabilmeyi ve
 gerçek pedal hissini veren şey budur.
@@ -117,66 +123,52 @@ kayabilir (ve ısınır), lastik patinaj yapabilir, vites boşta olabilir, motor
 stall edebilir. Şema bunların hepsini canlı gösterir — güç akış oklarının
 kalınlığı o an geçen torka göre değişir, motor freninde yön tersine döner.
 
-Gösterge paneli: devir saati (kırmızı bölge işaretli), hız, vites, su
-sıcaklığı, yağ basıncı, basınç, EGT, lambda, debriyaj ısısı ve ikaz lambaları
-(stall, rev limit, patinaj, el freni, vuruntu, yağ, hararet).
+Gösterge paneli: devir saati (kırmızı bölge işaretli), hız, vites, su sıcaklığı,
+yağ basıncı, basınç, EGT, lambda, debriyaj ısısı ve ikaz lambaları (stall, rev
+limit, patinaj, el freni, vuruntu, yağ, hararet).
 
 Doğrulama: Supra 0-100 km/s **6.3 s**, Civic Type R **7.2 s**, frenleme
 **−10.4 m/s²** (1.06 g). Kalkışta çekiş kuvveti tam olarak lastik tutunma
-sınırında kalıyor ve fazlası patinaja gidiyor.
+sınırında kalıyor, fazlası patinaja gidiyor.
 
-### Teşhis sekmesi
+### Ses
 
-İki ayrı soruya cevap verir. **Durum kontrolü** her kalemi ölçülen değer ve
-sınırıyla birlikte listeler (enjektör doluluğu, vuruntu payı, piston hızı,
-supap yüzme payı, yakıt sistemi payı, yağ basıncı, yağ filmi, yatak yükü,
-kompresör verimi, surge payı, uç hızı, türbin sıcaklığı, karşı basınç, EGT,
-buhar kilidi payı, motor sıcaklığı) — en kritik olan üstte.
+Hazır kayıt yok. Ses, ateşleme frekansından sentezleniyor:
 
-**Kök-neden analizi** tahmin değil hesaplama: vuruntuyu tetikleyen her etkenin
-payı, otomatik tutuşma gecikmesini ne kadar kısalttığından çıkarılır. Güç
-kaybı da aynı şekilde beygir cinsinden ayrıştırılır. **Enerji dengesi**
-yakıtın enerjisinin nereye gittiğini gösterir; sürtünme dökümü her mekanik
-kalemi ayrı ayrı HP olarak verir.
+- **Egzoz darbesi** — üstel azalan harmonik serisinden üretilen bir darbe
+  dizisi. Testere dişi veya kare dalga "sentezleyici" gibi duyulur; motor sesi
+  sürekli bir ton değil, ayrı ayrı basınç darbeleridir.
+- **Mimariye göre harmonikler** — V8'in yarım mertebesi (cross-plane çıtırtısı),
+  I4'ün 2. mertebe baskınlığı, V12'nin yoğun üst harmonikleri ayrı ayarlanır.
+- **Katmanlar** — egzoz ugultusu, emme hornu, yol/rüzgâr, iki bileşenli lastik
+  (cıyırtı + sürünme), fren cıvıltısı, turbo ıslığı, blow-off, marş.
+- **Egzoz patlamaları** — gaz kesmede, isteğe bağlı.
 
-### Animasyon sekmesi
+### Animasyon
 
-Animasyon **uydurma değil** — çözücünün hesapladığı çevrim izinden sürülür.
-Ekranda gördüğün piston konumu krank kinematiğinin kapalı form çözümü, supap
+Animasyon **uydurma değil** — çözücünün hesapladığı çevrim izinden sürülüyor.
+Ekranda gördüğünüz piston konumu krank kinematiğinin kapalı form çözümü, supap
 kalkışı kam profili, alev yarıçapı Wiebe yanmış kütle fraksiyonu, gaz rengi
 gerçek silindir içi sıcaklık, ok boyları gerçek kütle debisidir.
 
-Dört katman ayrı ayrı açılıp kapanabilir:
+Dört katman ayrı açılıp kapanabilir:
 
 - **Yanma** — bujiden yayılan alev cephesi, yanmış/yanmamış bölge ayrımı.
   Vuruntu integrali yükseldikçe son gaz bölgesi kırmızıya döner; otomatik
   tutuşma tam olarak orada olur.
-- **Supaplar** — kalkış animasyonu, akış yönü okları (geri akış/reversion
-  kırmızı çizilir), bindirme anında her iki supabın açık olduğu vurgulanır.
-- **Kuvvetler** — biyel açısı, etek yan kuvveti vektörü (hangi tarafa
-  bastığı), TDC ve ateşleme avansı ışınları.
+- **Supaplar** — kalkış animasyonu, akış yönü okları (geri akış kırmızı),
+  bindirme anında her iki supabın açık olduğu vurgulanır.
+- **Kuvvetler** — biyel açısı, etek yan kuvveti vektörü, TDC ve avans ışınları.
 - **Termal** — gaz sıcaklığının renk olarak gösterimi, basınç yoğunluğu.
 
-Yanında P-V diyagramı, basınç izi ve supap kalkış grafiği animasyonla senkron
-koşar. Krank açısı çubuğuyla istediğin ana kaydırıp inceleyebilirsin.
-
-Alttaki **çoklu silindir** görünümü mimariye sadıktır: V ve boxer motorlarda
-iki banka ortak krank merkezini paylaşır, sıralı motorlarda silindirler yan
-yana dizilir. Her silindir kendi ateşleme fazında olduğundan V8'in cross-plane
-krankı, boxer'ın karşılıklı hareketi ve I6'nın 120° dizilimi bir bakışta
-ayırt edilir. Ateşleme sırası ve aralığı üstte yazılıdır.
-
-Fuel map ızgarası gerçek kalibrasyon yazılımları gibi çalışır: tıkla-sürükle
-seçim, ok tuşlarıyla gezinme, doğrudan değer yazma, `Ctrl+C`/`Ctrl+V` ile
-Excel'e taşıma, seçili bölgeye `=` `+` `×` `%` işlemleri, yatay/dikey ara değer
-hesabı ve yumuşatma.
+Alttaki **çoklu silindir** görünümü mimariye sadıktır: V ve boxer motorlarda iki
+banka ortak krank merkezini paylaşır. Her silindir kendi ateşleme fazında
+olduğundan V8'in cross-plane krankı, boxer'ın karşılıklı hareketi ve I6'nın 120°
+dizilimi bir bakışta ayırt edilir.
 
 ---
 
 ## Modellenen fizik
-
-Bu bir eğri uydurma değil; her çevrim 720° boyunca 0.5° adımlarla enerji
-korunumu entegre edilerek çözülür.
 
 **Termodinamik**
 - NASA 7-terimli polinomlar (Gordon & McBride) — sıcaklığa bağlı gerçek cp/cv.
@@ -188,7 +180,7 @@ korunumu entegre edilerek çözülür.
 **Yanma**
 - Metghalchi–Keck laminer alev hızı korelasyonu
 - Türbülans yoğunluğu → türbülanslı alev hızı → yanma süresi (elle girilen
-  "burn duration" parametresi **yoktur**, alev hızından türetilir)
+  "burn duration" parametresi **yoktur**)
 - Wiebe ısı bırakma fonksiyonu
 - Douaud–Eyzat otomatik tutuşma modeli ile vuruntu integrali
 
@@ -198,7 +190,7 @@ korunumu entegre edilerek çözülür.
 - Helmholtz emme rezonansı, egzoz karşı basıncı, süpürme
 
 **Isı transferi**
-- Woschni korelasyonu, cidar sıcaklıkları ısı akısıyla birlikte değişir
+- Woschni korelasyonu, cidar sıcaklıkları ısı akısıyla değişir
 - Emme portu ısıtması (NTU yaklaşımı), yakıt buharlaşmasıyla dolgu soğutması
 - Son gaz sıcaklığı ayrı izlenir (sıkışma **ve** ısı kaybı) — vuruntuyu bu belirler
 
@@ -222,14 +214,14 @@ korunumu entegre edilerek çözülür.
 - Tahliye valfi, yağ pompası gücü, yağa giden ısı yükü
 
 **Yakıt sistemi**
-- Yakıt sıcaklığı → yoğunluk (enjektör kütlesel debisi), buhar basıncı
-  (buhar kilidi payı), atomizasyon (Sauter ortalama çapı)
+- Yakıt sıcaklığı → yoğunluk, buhar basıncı (buhar kilidi payı), atomizasyon
+  (Sauter ortalama çapı)
 - Pompa debi-basınç eğrisi; talep arzı aşınca ray basıncı düşer ve karışım
   **istenmeden fakirleşir** — bu geri besleme çevrime uygulanır
 
 **Termal durum**
-- Soğutma suyu sıcaklığından ısınma faktörü: zenginleştirme, yanma verimi
-  düşüşü, artan sürtünme, port ısıtmasının azalması
+- Canlı su ve yağ sıcaklığı (iki kütleli model, termostat, radyatör, fan)
+- Soğuk motor: zenginleştirme, yanma verimi düşüşü, artan sürtünme
 
 **Turbo**
 - Gerçek kompresör verim adası (basınç oranı × düzeltilmiş debi), surge ve
@@ -237,7 +229,7 @@ korunumu entegre edilerek çözülür.
 - Çark uç hızı ve şaft gerilme sınırı, turbo devri
 - Şaft ataletinden spool kayması (atalet çark çapının 5. kuvvetiyle artar)
 - Türbin A/R oranı: küçük → hızlı spool + yüksek karşı basınç
-- Türbin giriş sıcaklığı ve gövde dayanım sınırı, yatak ısı yükü
+- Türbin giriş sıcaklığı ve gövde dayanım sınırı
 
 **Egzoz manifoldu**
 - Log / fabrika döküm / tubular / eşit uzunluk / zoomies / bireysel
@@ -247,8 +239,6 @@ korunumu entegre edilerek çözülür.
 
 ## Doğruluk — dürüst değerlendirme
 
-Model, gerçek motorlarla karşılaştırıldığında:
-
 | Motor | Model tork | Gerçek | Model güç | Gerçek |
 |---|---|---|---|---|
 | Chevrolet LS3 | 565 N·m | 570 N·m | 385 HP | 430 HP |
@@ -256,36 +246,35 @@ Model, gerçek motorlarla karşılaştırıldığında:
 | Toyota 2JZ-GTE | 508 N·m | 441 N·m | 411 HP | ~320 HP |
 
 **Güvenilir olan:** eğrilerin şekli, parametre değişimlerinin yönü ve
-büyüklüğü, motorlar arası karşılaştırma. Kam süresini artırdığında düşük devir
-torkunun düşmesi, runner'ı uzattığında tepe noktasının kayması, E85'e geçince
+büyüklüğü, motorlar arası karşılaştırma. Kam süresini artırdığınızda düşük devir
+torkunun düşmesi, runner'ı uzattığınızda tepe noktasının kayması, E85'e geçince
 vuruntu payının açılması — bunların hepsi doğru çıkar.
 
-**Güvenilir olmayan:** mutlak güç rakamı. Özellikle yüksek devirde %20-30
-düşük tahmin edilir. İki sebebi var:
+**Güvenilir olmayan:** mutlak güç rakamı. Özellikle yüksek devirde %20-30 sapma
+olur. İki sebebi var:
 
 1. **1D gaz dinamiği yok.** Emme/egzoz borularındaki basınç dalgaları
    toplulaştırılmış bir rezonans modeliyle temsil ediliyor. Gerçek dalga
    etkileri yüksek devirde belirleyici.
 2. **Tek bölgeli (single-zone) model.** Taze dolgu ile artık gazın anında
-   karıştığı varsayılır; gerçekte tabakalaşma vardır ve bu, hesaplanan dolgu
-   sıcaklığını olduğundan yüksek gösterip hacimsel verimi bir miktar düşürür.
+   karıştığı varsayılır; gerçekte tabakalaşma vardır.
 
-İkincil preset verileri (supap çapları, yay basınçları, parça kütleleri,
-runner uzunlukları) çoğu motor için yayımlanmadığından çap/strok ve mimariden
+İkincil preset verileri (supap çapları, yay basınçları, parça kütleleri, runner
+uzunlukları) çoğu motor için yayımlanmadığından çap/strok ve mimariden
 ölçeklenmiş **temsilî** değerlerdir. Birincil ölçüler (çap, strok, biyel,
 sıkıştırma oranı, kırmızı çizgi) üretici verisidir.
 
-**Vuruntu modeli kalibrasyonu:** Douaud–Eyzat korelasyonu doğru eğilimi verir
-ama mutlak eşiği uygulamaya göre ölçeklenmelidir. Ölçek katsayısı (2.37) sekiz
+**Vuruntu kalibrasyonu:** Douaud–Eyzat korelasyonu doğru eğilimi verir ama
+mutlak eşiği uygulamaya göre ölçeklenmelidir. Ölçek katsayısı (2.37) sekiz
 bilinen motorun fabrika tam gaz avansına karşı ölçülerek belirlenmiştir;
 `npx tsx test/knock-cal.ts` ile yeniden üretilebilir.
 
 ---
 
-## Dosya yapısı
+## Mimari
 
 ```
-src/core/           Fizik çekirdeği — arayüzden tamamen bağımsız, test edilebilir
+src/core/           Fizik çekirdeği — arayüzden tamamen bağımsız
   types.ts            Tip tanımları ve birim politikası (içeride her şey SI)
   gas.ts              NASA polinomları, karışım özellikleri, sıkıştırılabilir akış
   geometry.ts         Krank kinematiği, hacim, kuvvetler
@@ -295,37 +284,106 @@ src/core/           Fizik çekirdeği — arayüzden tamamen bağımsız, test e
   friction.ts         Bileşen bazlı sürtünme
   induction.ts        Turbo, intercooler, emme ayarı, egzoz
   fuel.ts             Yakıt kimyası (AFR formülden hesaplanır)
+  lubrication.ts      Yağ basıncı, film kalınlığı, aşınma
+  coolingSystem.ts    Canlı su/yağ sıcaklığı, termostat, radyatör
+  drivetrain.ts       Debriyaj, vites kutusu, lastik, araç dinamiği
+  driverModel.ts      Pedal dinamiği, otomatik debriyaj, marş mantığı
   cycle.ts            ANA ÇÖZÜCÜ — krank açısı entegrasyonu
   sweep.ts            RPM süpürmesi, statik özellikler, tork haritası
   fuelmap.ts          Harita üretimi ve tablo işlemleri
   presets.ts          Motor kütüphanesi
 
-src/ui/             React arayüzü
-test/               Fizik doğrulama (99 test) ve tanılama betikleri
+src/ui/             React arayüzü (çizim, ses, paneller)
+test/               148 test
 ```
 
-Çekirdek, arayüzden hiçbir şey import etmez. İstersen `src/core`'u alıp
-Node.js'te, bir sunucuda veya başka bir arayüzle kullanabilirsin.
+Çekirdek, arayüzden hiçbir şey import etmez. `src/core`'u alıp Node.js'te, bir
+sunucuda veya başka bir arayüzle kullanabilirsiniz.
+
+---
+
+## Testler
+
+```bash
+npm test
+```
+
+**99 fizik testi** — her beklenen değer ya literatürden ya da elle yapılabilir
+bir hesaptan gelir; kaynağı yorumda belirtilmiştir. Havanın 300 K'deki
+cp'sinden Wiebe eğrisinin karakteristik noktalarına, tıkanık akışın analitik
+çözümünden zengin karışımın termodinamik verim tavanına kadar.
+
+**49 sürüş ve ses testi** — otomatik debriyaj, marş zamanlaması, dönen parça
+fazları, termal ısınma, ses parametrelerinin geçerliliği.
+
+Testler geliştirme sırasında bulunan ve **sessizce yanlış sonuç üreten**
+hataların geri gelmesini engeller — entalpi/iç enerji datum tutarlılığı
+(`h − u = R·T`), yanma zamanlaması, artık gaz ölçüm noktası gibi.
 
 ---
 
 ## Yeni motor eklemek
 
-`src/core/presets.ts` içindeki `PRESET_SPECS` dizisine bir kayıt ekle.
-Birincil ölçüleri (çap, strok, biyel, CR, supap, kam, kırmızı çizgi) ver;
+`src/core/presets.ts` içindeki `PRESET_SPECS` dizisine bir kayıt ekleyin.
+Birincil ölçüleri (çap, strok, biyel, CR, supap, kam, kırmızı çizgi) verin;
 yay basıncı, atalet ve yatak çapları gibi ikincil değerler `buildEngine`
 tarafından fiziksel kurallarla otomatik ölçeklenir.
 
 ---
 
-## Test edilenler
+## Katkı
 
-`npx tsx test/physics.test.ts` — 99 test. Her beklenen değer ya literatürden
-ya da elle yapılabilir bir hesaptan gelir; kaynağı yorumda belirtilmiştir.
-Havanın 300 K'deki cp'sinden Wiebe eğrisinin karakteristik noktalarına,
-tıkanık akışın analitik çözümünden zengin karışımın termodinamik verim
-tavanına kadar.
+Hata bildirimi ve öneri için
+[issue açabilirsiniz](https://github.com/hexdevp/motorsimulasyon/issues).
+Fizik modeliyle ilgili bir düzeltme öneriyorsanız, mümkünse kaynağını da
+belirtin — çekirdekteki her korelasyonun bir referansı var.
 
-Testler ayrıca geliştirme sırasında bulunan ve **sessizce yanlış sonuç üreten**
-hataların geri gelmesini engeller — özellikle entalpi/iç enerji datum
-tutarlılığı (`h − u = R·T`) ve yanma zamanlaması.
+---
+
+<div align="center">
+
+## English
+
+**A crank-angle-resolved internal combustion engine simulator that runs in your
+browser.** No install, no account, no server.
+
+### [▶ Live demo](https://hexdevp.github.io/motorsimulasyon/)
+
+</div>
+
+This is not a curve fitter. For every operating point the thermodynamic cycle is
+solved over 720° in 0.5° steps, integrating energy conservation at each step.
+Torque is the *result* of the cycle, not an input to it.
+
+There is no "burn duration" input box, because burn duration is derived from
+flame speed — which itself depends on mixture, temperature, pressure and
+turbulence. Increase cam duration and the model *calculates* why low-end torque
+drops.
+
+**What's modelled:** NASA 7-term thermodynamic polynomials, water-gas shift
+equilibrium for rich mixtures, Metghalchi–Keck laminar flame speed, Wiebe heat
+release, Douaud–Eyzat knock integral, Woschni heat transfer, compressible valve
+flow with reverse flow, Helmholtz intake resonance, component-level friction
+(Petroff bearings, ring tension, windage), oil pressure from pump/leakage
+equilibrium, compressor efficiency islands with surge and choke limits, live
+coolant and oil thermal masses, and a full drivetrain from clutch to tyre.
+
+**12 engine presets** (2JZ-GTE, LS3, K20A, EJ257, B58, RB26DETT, Coyote, Barra,
+EA888, Viper V10, Ferrari F140 V12, 4A-GE) with ~60 editable parameters each,
+a real-time driving mode with synthesised engine audio, a live 2D cylinder
+animation driven by the actual solver trace, and a fuel map editor that behaves
+like real calibration software.
+
+**Honest about limits:** absolute power is 20-30% off at high rpm — there is no
+1D gas dynamics and the model is single-zone. Curve shapes, parameter
+sensitivities and engine-to-engine comparisons are reliable. See the accuracy
+section above for the full accounting.
+
+UI is available in Turkish and English. Desktop only — the driving tab needs a
+keyboard.
+
+```bash
+npm install && npm run dev     # develop
+npm run build                  # → dist/index.html, a single self-contained file
+npm test                       # 148 tests
+```

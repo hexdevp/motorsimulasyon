@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "npm run test:physics && npm run test:drive",
     "test:physics": "tsx test/physics.test.ts",
-    "test:drive": "tsx test/driver.ts && tsx test/starter.ts && tsx test/phases.ts && tsx test/thermal.ts",
+    "test:drive": "tsx test/driver.ts && tsx test/starter.ts && tsx test/phases.ts && tsx test/thermal.ts && tsx test/audio.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

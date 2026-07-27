@@ -124,8 +124,22 @@ function rpm0Frac(rpm: number, idleRpm: number): boolean {
   return rpm < idleRpm * 2.2;
 }
 
-/** Yumusak parametre gecisi — tiklama sesini onler */
+/**
+ * Yumusak parametre gecisi — tiklama sesini onler.
+ *
+ * SONLULUK KONTROLU NEDEN BURADA:
+ * Web Audio, bir AudioParam'a NaN veya Infinity verildiginde istisna
+ * firlatir. Bu cagrilar surus dongusunun (requestAnimationFrame) icinde
+ * yapildigi icin tek bir gecersiz sayi dongunun bir daha kurulmasini
+ * engeller ve simulasyon KALICI olarak donar. Butun parametre yazimlari
+ * bu fonksiyondan gectigi icin suzgec en dogru sekilde burada durur.
+ *
+ * Gecersiz deger yok sayilir; parametre son gecerli degerinde kalir.
+ * Sessizlige dusurmek daha kotu olurdu — anlik bir bozuk sayi sesi
+ * kesmemeli, sadece o kareyi atlamali.
+ */
 function glide(param: AudioParam, value: number, now: number, tau = 0.03) {
+  if (!Number.isFinite(value) || !Number.isFinite(now)) return;
   param.setTargetAtTime(value, now, tau);
 }
 
@@ -309,6 +323,24 @@ export class EngineAudio {
       this.oscs.push(o);
       this.oscGains.push(g);
     });
+
+    // ---------- Egzoz gurultusu ----------
+    //
+    // Osilatorler ateslemenin PERIYODIK kismini verir; egzozun kendisi
+    // ayrica genis bantli bir ugultu uretir (turbulans, gaz akisi).
+    // Bu katman olmadan ses "sentezleyici" gibi duyulur — motorun
+    // dolgunlugu buradan gelir. Bant gecirgen filtre, atesleme
+    // frekansini takip ederek devirle birlikte yukselir.
+    this.exhaustNoise = this.loopSource(this.noiseBuf);
+    this.exhaustFilter = ctx.createBiquadFilter();
+    this.exhaustFilter.type = 'bandpass';
+    this.exhaustFilter.frequency.value = 220;
+    this.exhaustFilter.Q.value = 0.9;
+    this.exhaustGain = ctx.createGain();
+    this.exhaustGain.gain.value = 0;
+    this.exhaustNoise.connect(this.exhaustFilter);
+    this.exhaustFilter.connect(this.exhaustGain);
+    this.exhaustGain.connect(this.master);
 
     // ---------- Yol / ruzgar ----------
     this.roadNoise = this.loopSource(this.noiseBuf);
@@ -583,6 +615,10 @@ export class EngineAudio {
     freq: number, q: number, gain: number, dur: number, type: BiquadFilterType = 'bandpass',
   ) {
     if (!this.started || !this.ctx || !this.enabled) return;
+    // glide() ile ayni gerekce: gecersiz sayi Web Audio'yu firlatir ve
+    // surus dongusunu kalici olarak durdurur. Sesi hic ureteme, ama
+    // simulasyonu asla durdurma.
+    if (![freq, q, gain, dur].every(Number.isFinite) || dur <= 0 || gain <= 0) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
     const src = ctx.createBufferSource();
@@ -601,6 +637,9 @@ export class EngineAudio {
 
   private thump(freq: number, gain: number, dur: number) {
     if (!this.started || !this.ctx || !this.enabled) return;
+    // exponentialRampToValueAtTime hedefi 0'dan buyuk olmak ZORUNDA;
+    // freq * 0.45 kullanildigi icin freq de pozitif olmali.
+    if (![freq, gain, dur].every(Number.isFinite) || dur <= 0 || gain <= 0 || freq <= 0) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
     const o = ctx.createOscillator();
