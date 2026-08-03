@@ -243,6 +243,46 @@ export interface Ignition {
   sparkEnergy: number;
   /** Guvenlik payi: knock indeksi bu degeri asarsa avans cekilir (0-1) */
   knockThreshold: number;
+
+  // ============================================================
+  // VURUNTI KALIBRASYON SABITLERI
+  //
+  // Douaud-Eyzat korelasyonu tau'nun DOGRU EGILIMINI verir, ama mutlak
+  // esigi ve her degiskene duyarliligi uygulamaya gore ayarlanabilmelidir.
+  // Bu carpanlar disariya acilmistir ki model, elde olculmus bir motora
+  // (veya bir yaris sinifina) uydurulabilsin.
+  //
+  // Hepsinin varsayilani 1.0'dir ve 1.0'da model kalibre edilmis
+  // davranisini gosterir. Buyuk deger = o etkene DAHA DUYARLI.
+  // ============================================================
+
+  /**
+   * Genel olcek. Bolme sonrasi K=1.0 "sinirda vurunti" demektir.
+   * Sekiz bilinen motorun fabrika avansindan olculmustur.
+   */
+  knockScale: number;
+  /**
+   * Son gaz sicakligi duyarliligi. Arrhenius teriminin (exp(E/T))
+   * aktivasyon sicakligini olcekler. Buyutmek: sicaklik degisimi
+   * vuruntuyu daha sert etkiler.
+   */
+  knockTempFactor: number;
+  /**
+   * Basinc (doldurma) duyarliligi. p^(-1.7) ussunu olcekler.
+   * Buyutmek: basinc artisi vuruntuyu daha sert etkiler.
+   */
+  knockBoostFactor: number;
+  /**
+   * Zengin karisimin vuruntuyu bastirma gucu. Yakit buharlasmasinin
+   * dolguyu sogutmasi ve karisimin kendi tutusma direnci.
+   * 0 = lambdanin dogrudan etkisi yok (yalnizca alev hizi uzerinden).
+   */
+  knockLambdaFactor: number;
+  /**
+   * Tam yukte, bar basinc basina ek zenginlestirme (lambda birimi).
+   * Gercek ECU'lar basinc yukseldikce daha da zenginlestirir.
+   */
+  boostEnrichment: number;
 }
 
 // ============================================================
@@ -399,6 +439,16 @@ export interface OperatingPoint {
   knockRetard: number;
   /** Knock riski (0-1) */
   knockRisk: number;
+  /**
+   * Son gaz bolgesinin gordugu en yuksek sicaklik (K) — vuruntuyu
+   * belirleyen sicaklik budur, kutle-ortalamali silindir sicakligi degil.
+   */
+  endGasTemp: number;
+  /**
+   * Vurunti yuzunden kesilen basinc (bar). Atesleme rotari yetmediginde
+   * ECU wastegate'i acar; bu deger o kaybi gosterir.
+   */
+  knockBoostCut: number;
   /** Gosterge ortalama efektif basinci (Pa) */
   imep: number;
   /** Fren ortalama efektif basinci (Pa) */

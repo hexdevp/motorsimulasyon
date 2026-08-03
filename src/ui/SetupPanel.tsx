@@ -299,6 +299,32 @@ export function SetupPanel({ cfg, onChange, lang }: Props) {
               onChange={(x) => onChange(patch(cfg, 'ignition', { maxRetard: x }))} />
             <NumField label={t('knockThreshold', lang)} value={ig.knockThreshold} step={0.05} decimals={2}
               onChange={(x) => onChange(patch(cfg, 'ignition', { knockThreshold: Math.max(x, 0.1) }))} />
+            <NumField label={t('boostEnrichment', lang)} value={ig.boostEnrichment} step={0.005} decimals={3}
+              onChange={(x) => onChange(patch(cfg, 'ignition', {
+                boostEnrichment: Math.max(0, Math.min(x, 0.25)),
+              }))} />
+          </Card>
+
+          {/* Vurunti modelinin kalibrasyon carpanlari. Hepsi 1.0'da
+              kalibre edilmis davranisi verir; elde olculmus bir motora
+              uydurmak isteyen buradan oynatir. */}
+          <Card title={t('grpKnockCal', lang)}>
+            <NumField label={t('knockScale', lang)} value={ig.knockScale} step={0.05} decimals={2}
+              onChange={(x) => onChange(patch(cfg, 'ignition', {
+                knockScale: Math.max(0.2, Math.min(x, 5)),
+              }))} />
+            <NumField label={t('knockTempFactor', lang)} value={ig.knockTempFactor} step={0.02} decimals={2}
+              onChange={(x) => onChange(patch(cfg, 'ignition', {
+                knockTempFactor: Math.max(0.5, Math.min(x, 1.6)),
+              }))} />
+            <NumField label={t('knockBoostFactor', lang)} value={ig.knockBoostFactor} step={0.05} decimals={2}
+              onChange={(x) => onChange(patch(cfg, 'ignition', {
+                knockBoostFactor: Math.max(0.3, Math.min(x, 2.5)),
+              }))} />
+            <NumField label={t('knockLambdaFactor', lang)} value={ig.knockLambdaFactor} step={0.05} decimals={2}
+              onChange={(x) => onChange(patch(cfg, 'ignition', {
+                knockLambdaFactor: Math.max(0, Math.min(x, 3)),
+              }))} />
           </Card>
 
           <Card title={t('grpEnvironment', lang)}>

@@ -147,6 +147,64 @@ export function fuelMassPerAirMass(fuel: FuelSpec, lambda: number): number {
   return 1 / (fuel.afrStoich * lambda);
 }
 
+/**
+ * Yuke bagli hedef lambda — ECU'nun zenginlestirme stratejisi.
+ *
+ * Gercek motor kontrol uniteleri kismi yukte stokiyometriye yakin calisir
+ * (verim ve katalizor omru icin), tam yukte ise ZENGIN calisir.
+ * Zenginlestirmenin iki isi vardir ve ikisi de vuruntuyu dogrudan
+ * ilgilendirir:
+ *
+ *   1. Fazla yakit buharlasirken dolgudan gizli isi ceker. Dolgu sogur,
+ *      son gaz sicakligi duser, otomatik tutusma gecikmesi uzar.
+ *      Turbo motorlarda vuruntuyu bastirmanin BIRINCIL araci budur —
+ *      avans geri cekmek ikinci caredir ve gucu daha pahaliya mal olur.
+ *   2. Egzoz gazi sicakligini dusurur (turbin govdesi ve supap korumasi).
+ *
+ * Gecis DOGRUSAL DEGILDIR. Kismi yukte zenginlestirme yoktur; belirli bir
+ * yuk esiginden sonra hizla devreye girer. smoothstep (3t²−2t³) bu "once
+ * yumusak baslayip sonra hizlanan, sonra tekrar yumusayan" davranisi
+ * verir; dogrusal gecis yakit haritasinda gercek olmayan bir kirik uretir.
+ *
+ * Asiri doldurulmus motorlarda WOT lambdasi tek basina yetmez: basinc
+ * yukseldikce ECU daha da zenginlestirir. 1 bar basincta calisan bir
+ * motor, ayni motorun atmosferik halinden belirgin olarak daha zengindir.
+ * Ek terim bu yuzden basincla orantilidir.
+ *
+ * @param targetLambda      Kismi yuk hedefi (tipik 0.92-1.00)
+ * @param targetLambdaWOT   Tam yuk hedefi (tipik 0.82-0.90)
+ * @param manifoldPressurePa Manifold mutlak basinci
+ * @param ambientPressurePa  Ortam basinci
+ * @param boostEnrichment   Bar basinc basina ek zenginlestirme (lambda birimi)
+ */
+export function commandedLambda(
+  targetLambda: number,
+  targetLambdaWOT: number,
+  manifoldPressurePa: number,
+  ambientPressurePa: number,
+  boostEnrichment = 0.055,
+): number {
+  const amb = Math.max(ambientPressurePa, 1);
+  // Yuk olcusu: manifold basincinin ortama orani. Atmosferik motorda
+  // kelebek tam acikken ~1.0, kismi yukte daha dusuk; asiri doldurmada
+  // 1'in uzerine cikar.
+  const load = manifoldPressurePa / amb;
+
+  // Zenginlestirmenin basladigi ve tamamlandigi yuk noktalari
+  const lo = 0.72, hi = 0.98;
+  const t = Math.max(0, Math.min((load - lo) / (hi - lo), 1));
+  const s = t * t * (3 - 2 * t);
+
+  let lambda = targetLambda + (targetLambdaWOT - targetLambda) * s;
+
+  // Basinc basina ek zenginlestirme — yalnizca tam yuke gecildiginde
+  const boostBar = Math.max(manifoldPressurePa - amb, 0) / 1e5;
+  lambda -= boostEnrichment * boostBar * s;
+
+  // Alt sinir yanabilirlik, ust sinir makul fakirlik
+  return Math.max(0.65, Math.min(lambda, 1.15));
+}
+
 // ============================================================
 // YAKIT SICAKLIGI
 // ============================================================

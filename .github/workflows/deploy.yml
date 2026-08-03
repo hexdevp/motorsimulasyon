@@ -39,6 +39,7 @@ jobs:
       - name: Fizik testleri
         run: |
           npx tsx test/physics.test.ts
+          npx tsx test/knock.ts
           npx tsx test/driver.ts
           npx tsx test/starter.ts
           npx tsx test/phases.ts

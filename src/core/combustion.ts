@@ -220,20 +220,69 @@ export function burnDurations(
 // ============================================================
 
 /**
+ * Vurunti modeli kalibrasyon carpanlari.
+ *
+ * Hepsinin varsayilani 1.0'dir; 1.0'da model kalibre edilmis davranisini
+ * gosterir. Disariya acilmis olmalarinin sebebi, korelasyonun mutlak
+ * esiginin uygulamaya gore degismesidir — elde olculmus bir motora veya
+ * bir yaris sinifina uydurmak icin bu carpanlar kullanilir.
+ */
+export interface KnockCalibration {
+  /** Genel olcek — buyutmek vuruntuyu GECIKTIRIR (daha az riskli) */
+  scale: number;
+  /** Son gaz sicakligi duyarliligi (Arrhenius aktivasyon terimi) */
+  tempFactor: number;
+  /** Basinc/doldurma duyarliligi (basinc ussu) */
+  boostFactor: number;
+  /** Zengin karisimin dogrudan bastirma gucu */
+  lambdaFactor: number;
+}
+
+export const DEFAULT_KNOCK_CAL: KnockCalibration = {
+  scale: 1, tempFactor: 1, boostFactor: 1, lambdaFactor: 1,
+};
+
+/**
  * Otomatik tutusma gecikmesi tau (saniye) — Douaud & Eyzat korelasyonu.
  *
  *   tau [ms] = 17.68 · (ON/100)^3.402 · p[atm]^(−1.7) · exp(3800/T)
  *
  * Yanmamis gaz "son gaz" (end gas) bolgesindedir; alev oraya varmadan
  * once kendiliginden tutusursa vurunti olur.
+ *
+ * LAMBDA TERIMI (korelasyonun aslinda yok, ayrica eklendi):
+ * Zengin karisim vuruntuya iki yoldan direnir. Birincisi buharlasma
+ * sogutmasidir ve bu modelde AYRI ele alinir (chargeCoolingDrop → dolgu
+ * sicakligi → son gaz sicakligi), burada TEKRAR sayilmaz. Ikincisi
+ * kimyasaldir: fazla yakit, son gaz bolgesindeki serbest radikalleri
+ * tuketerek zincir dallanma reaksiyonlarini yavaslatir. Bu ikinci etki
+ * asagidaki terimle temsil edilir ve ampiriktir — bu yuzden gucu
+ * lambdaFactor ile ayarlanabilir.
+ *
+ * Etki yalnizca lambda < 1 icin uygulanir; fakir karisimin vurunti
+ * davranisi farkli bir rejimdir ve bu korelasyonun kapsami disindadir.
+ *
+ * @param lambda Yanan karisimin lambda degeri (1.0 = stokiyometrik)
  */
-export function autoignitionDelay(octaneNumber: number, pressurePa: number, tempK: number): number {
+export function autoignitionDelay(
+  octaneNumber: number,
+  pressurePa: number,
+  tempK: number,
+  lambda = 1,
+  cal: KnockCalibration = DEFAULT_KNOCK_CAL,
+): number {
   const pAtm = Math.max(pressurePa / 101325, 0.05);
+
+  // Zenginlik kaynakli kimyasal direnc. lambda 0.80'de tau ~%18 uzar.
+  const richness = Math.max(1 - Math.min(lambda, 1), 0);
+  const richResistance = 1 + 0.9 * cal.lambdaFactor * richness;
+
   const tauMs =
     17.68 *
     Math.pow(octaneNumber / 100, 3.402) *
-    Math.pow(pAtm, -1.7) *
-    Math.exp(3800 / Math.max(tempK, 300));
+    Math.pow(pAtm, -1.7 * cal.boostFactor) *
+    Math.exp((3800 * cal.tempFactor) / Math.max(tempK, 300)) *
+    richResistance;
   return tauMs / 1000;
 }
 
@@ -280,9 +329,11 @@ export function knockIntegralStep(
   pressurePa: number,
   endGasTempK: number,
   dtSec: number,
+  lambda = 1,
+  cal: KnockCalibration = DEFAULT_KNOCK_CAL,
 ): number {
-  const tau = autoignitionDelay(octaneNumber, pressurePa, endGasTempK);
-  return dtSec / (Math.max(tau, 1e-9) * KNOCK_SCALE);
+  const tau = autoignitionDelay(octaneNumber, pressurePa, endGasTempK, lambda, cal);
+  return dtSec / (Math.max(tau, 1e-9) * KNOCK_SCALE * Math.max(cal.scale, 0.05));
 }
 
 /**

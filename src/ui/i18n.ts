@@ -81,6 +81,12 @@ const D: Dict = {
   fixedAdvance: ['Sabit avans', 'Fixed advance'],
   maxRetard: ['Maks geri çekme', 'Max retard'],
   knockThreshold: ['Vuruntu eşiği', 'Knock threshold'],
+  boostEnrichment: ['Basınç zenginleştirmesi (λ/bar)', 'Boost enrichment (λ/bar)'],
+  grpKnockCal: ['Vuruntu kalibrasyonu', 'Knock calibration'],
+  knockScale: ['Genel ölçek', 'Overall scale'],
+  knockTempFactor: ['Sıcaklık faktörü', 'Temperature factor'],
+  knockBoostFactor: ['Basınç faktörü', 'Boost factor'],
+  knockLambdaFactor: ['Karışım faktörü', 'Mixture factor'],
   pistonMass: ['Piston kütlesi', 'Piston mass'],
   rodMass: ['Biyel kütlesi', 'Rod mass'],
   flywheelInertia: ['Volan ataleti', 'Flywheel inertia'],
@@ -351,6 +357,10 @@ const D: Dict = {
   causeLowRpm: ['Düşük devir', 'Low engine speed'],
   causeLeanMixture: ['Fakir karışım', 'Lean mixture'],
   causeLowResidual: ['Az artık gaz', 'Low residual dilution'],
+  causeWeakIntercooler: ['Zayıf intercooler', 'Weak intercooler'],
+
+  stEndGasTemp: ['Son gaz sıcaklığı', 'End-gas temperature'],
+  stKnockBoostCut: ['Vuruntu basınç kesmesi', 'Knock boost cut'],
 
   lossAmbient: ['Ortam koşulları', 'Ambient conditions'],
   lossKnockRetard: ['Vuruntu geri çekmesi', 'Knock retard'],

@@ -8,7 +8,7 @@
 
 Kurulum yok, hesap yok, sunucu yok. Aç ve kullan.
 
-![Lisans](https://img.shields.io/badge/test-148%20ge%C3%A7iyor-brightgreen)
+![Lisans](https://img.shields.io/badge/test-190%20ge%C3%A7iyor-brightgreen)
 ![Fizik](https://img.shields.io/badge/%C3%A7%C3%B6z%C3%BCc%C3%BC-0D%20krank%20a%C3%A7%C4%B1s%C4%B1-blue)
 ![Boyut](https://img.shields.io/badge/tek%20dosya-364%20KB-lightgrey)
 ![Dil](https://img.shields.io/badge/dil-TR%20%2F%20EN-informational)
@@ -182,7 +182,48 @@ dizilimi bir bakışta ayırt edilir.
 - Türbülans yoğunluğu → türbülanslı alev hızı → yanma süresi (elle girilen
   "burn duration" parametresi **yoktur**)
 - Wiebe ısı bırakma fonksiyonu
-- Douaud–Eyzat otomatik tutuşma modeli ile vuruntu integrali
+
+**Vuruntu**
+
+Vuruntu, parametrelerin toplandığı bir "risk puanı" değil. Çevrim boyunca
+son gaz bölgesi ayrı izlenir ve her adımda Douaud–Eyzat otomatik tutuşma
+integrali biriktirilir:
+
+```
+K = ∫ dt / τ(p, T_songaz, RON, λ)
+τ ∝ (RON/100)^3.402 · p^(−1.7) · exp(3800/T) · zenginlikDirenci
+```
+
+Üsler doğrusal değildir ve bu kasıtlıdır: sıcaklık üstel, basınç kuvvet
+yasası, oktan 3.4'üncü kuvvetle girer. Sıcaklığın baskın etken olması bu
+yapının doğal sonucudur.
+
+Son gaz sıcaklığını belirleyen zincirin tamamı modellenir: ortam →
+kompresör verimi → intercooler → **yakıt buharlaşmasıyla dolgu soğutması**
+→ port ısıtması → sıkıştırma → cidar ısı geçişi.
+
+ECU'nun iki savunma hattı vardır ve sırayla devreye girer:
+
+1. **Ateşleme rötarı** — ikili aramayla vuruntu sınırına oturtulur
+   (atmosferikte 16°, turboda 24° yetki). Avans hiçbir koşulda TDC
+   sonrasına geçmez.
+2. **Basınç kesme** — rötar yetmezse wastegate açılır. Hızlı yanan,
+   MBT'si zaten düşük modern motorlarda geri çekecek yer olmadığı için bu
+   hat devreye girer; model kaybedilen basıncı ayrıca raporlar.
+
+Tam yük zenginleştirmesi de modellenir: yük eşiği aşılınca karışım
+smoothstep ile WOT hedefine iner ve basınçla birlikte daha da zenginleşir.
+Fazla yakıt buharlaşırken dolgudan gizli ısı çeker — turbo motorlarda
+vuruntuyu bastırmanın birincil mekanizması budur.
+
+**Vuruntu riski** ise "sınırlayıcı çalışıyor mu" değil, **savunma payının
+ne kadarının tükendiği** demektir: 0.50 tam kalibrasyon sınırında çalışmak
+(fabrika motoru için normaldir), 1.00 üzeri rötar ve basınç yetkisinin
+bitmesi (gerçek detonasyon). 12 stok motorun hiçbiri fabrika ayarında
+uyarı vermez ve bu bir testle kilitlenmiştir.
+
+Kalibrasyon çarpanları (genel ölçek, sıcaklık, basınç, karışım) arayüzden
+ayarlanabilir; elde ölçülmüş bir motora uydurmak için.
 
 **Akış**
 - Supap kalkış profili, perde alanı ve port boğazı kısıtı
@@ -294,7 +335,7 @@ src/core/           Fizik çekirdeği — arayüzden tamamen bağımsız
   presets.ts          Motor kütüphanesi
 
 src/ui/             React arayüzü (çizim, ses, paneller)
-test/               148 test
+test/               190 test
 ```
 
 Çekirdek, arayüzden hiçbir şey import etmez. `src/core`'u alıp Node.js'te, bir
@@ -312,6 +353,11 @@ npm test
 bir hesaptan gelir; kaynağı yorumda belirtilmiştir. Havanın 300 K'deki
 cp'sinden Wiebe eğrisinin karakteristik noktalarına, tıkanık akışın analitik
 çözümünden zengin karışımın termodinamik verim tavanına kadar.
+
+**42 vuruntu testi** — 12 stok motorun hiçbiri fabrika ayarında uyarı
+vermemeli; düşük oktan / yüksek basınç / fakir karışım vuruntuyu artırmalı,
+zengin karışım ve iyi intercooler azaltmalı; rötar yetkisi tükendiğinde ECU
+basıncı kesmeli; avans hiçbir koşulda TDC sonrasına geçmemeli.
 
 **49 sürüş ve ses testi** — otomatik debriyaj, marş zamanlaması, dönen parça
 fazları, termal ısınma, ses parametrelerinin geçerliliği.
@@ -362,7 +408,9 @@ drops.
 
 **What's modelled:** NASA 7-term thermodynamic polynomials, water-gas shift
 equilibrium for rich mixtures, Metghalchi–Keck laminar flame speed, Wiebe heat
-release, Douaud–Eyzat knock integral, Woschni heat transfer, compressible valve
+release, a crank-resolved Douaud–Eyzat knock integral over a separately tracked
+end-gas zone (with charge cooling from fuel vaporisation, load-dependent
+enrichment, ignition retard and knock-driven boost cut), Woschni heat transfer, compressible valve
 flow with reverse flow, Helmholtz intake resonance, component-level friction
 (Petroff bearings, ring tension, windage), oil pressure from pump/leakage
 equilibrium, compressor efficiency islands with surge and choke limits, live
@@ -385,5 +433,5 @@ keyboard.
 ```bash
 npm install && npm run dev     # develop
 npm run build                  # → dist/index.html, a single self-contained file
-npm test                       # 148 tests
+npm test                       # 190 tests
 ```

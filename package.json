@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "npm run test:physics && npm run test:drive",
+    "test": "npm run test:physics && npm run test:knock && npm run test:drive",
+    "test:knock": "tsx test/knock.ts",
+    "knock:audit": "tsx test/knock-audit.ts",
     "test:physics": "tsx test/physics.test.ts",
     "test:drive": "tsx test/driver.ts && tsx test/starter.ts && tsx test/phases.ts && tsx test/thermal.ts && tsx test/audio.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

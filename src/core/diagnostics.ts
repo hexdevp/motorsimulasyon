@@ -65,6 +65,11 @@ export function statusChecks(cfg: EngineConfig, p: OperatingPoint): StatusItem[]
   });
 
   // --- Vurunti payi ---
+  //
+  // knockRisk artik "savunma payinin ne kadari tukendi" demek; 0.50
+  // kalibrasyon sinirinda calismak anlamina gelir ve fabrika motoru
+  // icin NORMALDIR. Bu yuzden esikler ona gore: pay %50 civari saglikli,
+  // %15'in altina inince gercekten dar.
   const knockMargin = 1 - p.knockRisk;
   items.push({
     key: 'stKnockMargin',
@@ -73,6 +78,30 @@ export function statusChecks(cfg: EngineConfig, p: OperatingPoint): StatusItem[]
     limit: `${p.knockRetard > 0.05 ? `−${p.knockRetard.toFixed(1)}° geri çekme` : 'MBT'}`,
     fraction: clamp(knockMargin, 0, 1),
   });
+
+  // --- Son gaz sicakligi ---
+  // Vuruntuyu belirleyen sicaklik budur. 950 K uzeri otomatik tutusma
+  // bolgesine yaklasir; 1050 K uzeri neredeyse her oktan icin kritik.
+  items.push({
+    key: 'stEndGasTemp',
+    severity: gradeHigh(p.endGasTemp, 950, 1050),
+    value: `${(p.endGasTemp - 273.15).toFixed(0)} °C`,
+    limit: '677 °C',
+    fraction: clamp(p.endGasTemp / 1050, 0, 1),
+  });
+
+  // --- Vurunti yuzunden kesilen basinc ---
+  // Yalnizca gercekten kesme varsa gosterilir; 0 ise listeyi kalabalik
+  // etmenin anlami yok.
+  if (p.knockBoostCut > 0.01) {
+    items.push({
+      key: 'stKnockBoostCut',
+      severity: gradeHigh(p.knockBoostCut, 0.15, 0.4),
+      value: `−${p.knockBoostCut.toFixed(2)} bar`,
+      limit: 'ECU wastegate açtı',
+      fraction: clamp(p.knockBoostCut / 0.5, 0, 1),
+    });
+  }
 
   // --- Ortalama piston hizi ---
   items.push({
@@ -237,59 +266,93 @@ export interface CauseItem {
 export function knockCauses(cfg: EngineConfig, p: OperatingPoint): CauseItem[] {
   const causes: CauseItem[] = [];
 
-  // Her etken icin "referans kosuldan sapma" bir log-oranla olculur;
-  // tau'nun ilgili degiskene duyarliligi carpan olarak kullanilir.
+  // ============================================================
+  // AGIRLIKLAR NEREDEN GELIYOR
+  //
+  // Her etkenin agirligi UYDURULMUS bir katsayi degil, modelin fiilen
+  // kullandigi Douaud-Eyzat korelasyonunun o degiskene gore turevidir:
+  //
+  //   tau ∝ (ON/100)^3.402 · p^(−1.7) · exp(3800/T) · zenginlikDirenci
+  //
+  // Vurunti HIZI 1/tau oldugundan, log-duyarliliklar dogrudan ussler:
+  //
+  //   ∂ln(1/tau)/∂ln(ON) = −3.402      → oktan ussu
+  //   ∂ln(1/tau)/∂ln(p)  = +1.7        → basinc ussu
+  //   ∂ln(1/tau)/∂ln(T)  = +3800/T     → Arrhenius terimi
+  //
+  // Yani "sikistirma orani %10 artarsa vurunti hizi ne kadar artar"
+  // sorusunun cevabi tahmin degil, korelasyonun kendisinden okunuyor.
+  // Referans olarak son gaz sicakligi kullanilir; 3800/T carpani da
+  // oradan gelir (T ~ 800 K'de ≈ 4.75, yani sicaklik en agir etkendir —
+  // pratikte bilinen dogru da budur).
+  // ============================================================
   const contributions: { key: string; weight: number; detail: string }[] = [];
 
-  // 1) Sikistirma orani — son gaz basincini dogrudan belirler
-  const crRef = 10.0;
+  const T_END = Math.max(p.endGasTemp || 800, 400);
+  const S_TEMP = 3800 / T_END;   // sicakligin log-duyarliligi
+  const S_PRES = 1.7;            // basincin log-duyarliligi
+  const S_OCT = 3.402;           // oktanin log-duyarliligi
+
+  /** Bir degiskenin referanstan log sapmasi × duyarliligi */
+  const logDev = (value: number, ref: number, sens: number) =>
+    Math.max(Math.log(Math.max(value, 1e-9) / ref) * sens, 0);
+
+  // 1) Sikistirma orani — son gaz basincini dogrudan belirler.
+  //    Basinc ~ CR^gamma oldugundan CR'nin basinc uzerinden duyarliligi
+  //    S_PRES · gamma'dir.
   contributions.push({
     key: 'causeCompression',
-    weight: Math.max(Math.log(cfg.geometry.compressionRatio / crRef) * 1.7, 0),
+    weight: logDev(p.dynamicCompressionRatio, 8.5, S_PRES * 1.32),
     detail: `${cfg.geometry.compressionRatio.toFixed(1)}:1 (dinamik ${p.dynamicCompressionRatio.toFixed(1)}:1)`,
   });
 
-  // 2) Emme havasi sicakligi
-  const iatRef = 305;
+  // 2) Emme havasi sicakligi — sikistirma sonunda orantili olarak buyur
   contributions.push({
     key: 'causeIAT',
-    weight: Math.max((p.iat - iatRef) / 45, 0),
+    weight: logDev(p.iat, 305, S_TEMP),
     detail: `${(p.iat - 273.15).toFixed(0)} °C`,
   });
 
   // 3) Manifold basinci (doldurma)
   contributions.push({
     key: 'causeBoost',
-    weight: Math.max((p.map / 101325 - 1) * 1.9, 0),
+    weight: logDev(p.map, 101325, S_PRES),
     detail: `${(p.map / 1e5).toFixed(2)} bar (${((p.map - 101325) / 1e5).toFixed(2)} bar basınç)`,
   });
 
-  // 4) Yakit oktani (dusuk oktan = pozitif katki)
-  const ronRef = 98;
+  // 4) Yakit oktani — korelasyonun kendi ussu
   contributions.push({
     key: 'causeOctane',
-    weight: Math.max((ronRef - cfg.fuel.ron) / 12, 0),
+    weight: logDev(98, cfg.fuel.ron, S_OCT),
     detail: `${cfg.fuel.ron} RON ${cfg.fuel.name}`,
   });
 
-  // 5) Sogutma suyu / cidar sicakligi
+  // 5) Sogutma suyu / cidar sicakligi — son gaza cidardan isi gecer
   contributions.push({
     key: 'causeCoolant',
-    weight: Math.max((cfg.mechanical.coolantTemp - 361) / 22, 0),
+    weight: logDev(p.chamberWallTemp, 430, S_TEMP * 0.45),
     detail: `${(cfg.mechanical.coolantTemp - 273.15).toFixed(0)} °C (oda cidarı ${(p.chamberWallTemp - 273.15).toFixed(0)} °C)`,
   });
 
-  // 6) Devir — dusuk devirde son gazin bekleme suresi uzar
+  // 6) Devir — son gazin yuksek basincta BEKLEME SURESI devirle ters
+  //    orantilidir; integral dogrudan sureyle carpilir, yani duyarlilik 1.
   contributions.push({
     key: 'causeLowRpm',
-    weight: Math.max((3200 - p.rpm) / 2600, 0),
+    weight: logDev(3200, p.rpm, 1.0),
     detail: `${p.rpm} rpm (düşük devirde son gaz daha uzun bekler)`,
   });
 
-  // 7) Karisim — fakir karisim daha sicak yanar
+  // 7) Karisim — zengin karisim vuruntuyu bastirir; fakir olmak
+  //    hem dolgu sogutmasini azaltir hem kimyasal direnci dusurur.
+  //    autoignitionDelay'deki zenginlik terimiyle ayni bicim.
+  const richRef = 0.88;
   contributions.push({
     key: 'causeLeanMixture',
-    weight: Math.max((p.lambda - 0.88) * 2.4, 0),
+    weight: Math.max(
+      Math.log((1 + 0.9 * Math.max(1 - Math.min(richRef, 1), 0)) /
+               (1 + 0.9 * Math.max(1 - Math.min(p.lambda, 1), 0))),
+      0,
+    ) * 2.5,
     detail: `λ ${p.lambda.toFixed(2)} (AFR ${p.afr.toFixed(1)})`,
   });
 
@@ -299,6 +362,22 @@ export function knockCauses(cfg: EngineConfig, p: OperatingPoint): CauseItem[] {
     weight: Math.max((0.06 - p.residualFraction) * 6, 0),
     detail: `%${(p.residualFraction * 100).toFixed(1)} artık gaz`,
   });
+
+  // 9) Intercooler — yalnizca asiri doldurulmus motorlarda anlamli.
+  //    Kotu bir intercooler emme sicakligini yukselttigi icin etkisi
+  //    sicaklik duyarliligi uzerinden hesaplanir. IAT ile ayni koke
+  //    dayandigi icin agirligi yarilanir (cifte sayim olmasin).
+  if (cfg.induction.type !== 'NA') {
+    const icEff = cfg.induction.intercoolerEfficiency;
+    const icRef = 0.78;
+    contributions.push({
+      key: 'causeWeakIntercooler',
+      weight: icEff < icRef
+        ? logDev((1 - icEff), (1 - icRef), S_TEMP * 0.5)
+        : 0,
+      detail: `%${(icEff * 100).toFixed(0)} etkinlik`,
+    });
+  }
 
   const total = contributions.reduce((s, c) => s + c.weight, 0);
   if (total < 1e-6) return [];

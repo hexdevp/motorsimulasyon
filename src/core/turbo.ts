@@ -140,7 +140,18 @@ export function compressorEfficiency(
   peakEff: number,
 ): { efficiency: number; surgeMargin: number; chokeMargin: number } {
   const wPR = Math.max(peakPR * 0.55, 0.35);
-  const wF = Math.max(peakFlow * 0.52, 0.02);
+  // Debi yonundeki ada genisligi.
+  //
+  // Gercek kompresor haritalarinda verim adalari debi yonunde GENISTIR:
+  // tepe verim debisinin yarisinda bile verim tipik olarak %60'in
+  // uzerinde kalir. Onceki 0.52 katsayisi adayi asiri dar yapiyordu —
+  // tepe debinin yarisinda verim %20'lere dusuyor, kompresor havayi
+  // 80 °C'nin uzerine isitiyor ve motor olmadigi kadar vuruntulu
+  // gorunuyordu.
+  //
+  // 0.95 ile: tepe debinin yarisinda verim ~%60, ucte birinde ~%50 —
+  // yayimlanmis Garrett/BorgWarner haritalarina yakin.
+  const wF = Math.max(peakFlow * 0.95, 0.02);
 
   const dPR = (pressureRatio - peakPR) / wPR;
   const dF = (corrFlow - peakFlow) / wF;

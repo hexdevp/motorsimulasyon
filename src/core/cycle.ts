@@ -40,6 +40,7 @@ import {
 import {
   wiebeBurnFraction, wiebeBurnRate, laminarFlameSpeed, turbulenceIntensity,
   turbulentFlameSpeed, burnDurations, knockIntegralStep, endGasStep,
+  type KnockCalibration,
   effectiveOctane, chargeCoolingDrop,
 } from './combustion';
 import {
@@ -60,6 +61,7 @@ import {
 } from './turbo';
 import {
   fuelDensityAt, solveFuelSupply, vaporLockMargin, sauterMeanDiameter,
+  commandedLambda,
 } from './fuel';
 
 const DEG2RAD = Math.PI / 180;
@@ -142,6 +144,14 @@ export interface CycleResult {
   pressureAtEVO: number;
   /** Vurunti integralinin cevrim sonu degeri */
   knockIntegral: number;
+  /**
+   * Son gaz bolgesinin gordugu EN YUKSEK sicaklik (K).
+   *
+   * Vuruntuyu belirleyen sicaklik budur — kutle-ortalamali silindir
+   * sicakligi degil. Tesihiste her etkenin agirligi Arrhenius
+   * teriminden (3800/T) hesaplandigi icin bu deger disariya verilir.
+   */
+  peakEndGasTemp: number;
   /** Cidara giden toplam isi (J) */
   wallHeat: number;
   /** Cevrim ortalamasi isi akisi (W/m²) */
@@ -271,6 +281,13 @@ export function integrateCycle(
 
   const octane = effectiveOctane(fuel, cfg.induction.type !== 'NA');
   const recipMass = reciprocatingMass(cfg.mechanical);
+  // Vurunti kalibrasyon carpanlari — kullanici ayarlayabilir
+  const knockCal: KnockCalibration = {
+    scale: cfg.ignition.knockScale,
+    tempFactor: cfg.ignition.knockTempFactor,
+    boostFactor: cfg.ignition.knockBoostFactor,
+    lambdaFactor: cfg.ignition.knockLambdaFactor,
+  };
 
   // --- Durum degiskenleri ---
   let m = start.mass;
@@ -285,6 +302,7 @@ export function integrateCycle(
   let workPumping = 0;
   let wallHeat = 0;
   let knockIntegral = 0;
+  let peakEndGasTemp = 0;
   let peakP = 0, peakPAngle = 0, peakT = 0;
   let peakSideForce = 0, peakRodForce = 0, peakPistonSpeed = 0;
   let tempAtEVO = T, pressureAtEVO = bc.exhaustPressure;
@@ -464,11 +482,14 @@ export function integrateCycle(
       const tauThermal = (unburnedMass * cv) / Math.max(hConv * endGasArea, 1e-6);
       tEndGas += endGasStep(tEndGas, p, dp, Twall, dtSec, 1.34, tauThermal);
       tEndGas = clamp(tEndGas, 250, 1600);
+      if (tEndGas > peakEndGasTemp) peakEndGasTemp = tEndGas;
 
       // Yanmanin son %5'inde geriye anlamli bir son gaz kutlesi kalmaz;
       // o bolgede integral biriktirmek vuruntiyu suni olarak sisirir.
       if (xb < 0.95 && theta > -120 && theta < 90) {
-        knockIntegral += knockIntegralStep(octane, p, tEndGas, dtSec);
+        knockIntegral += knockIntegralStep(
+          octane, p, tEndGas, dtSec, lambda, knockCal,
+        );
       }
     }
     pPrevStep = p;
@@ -562,6 +583,7 @@ export function integrateCycle(
     peakTemperature: peakT,
     tempAtEVO, pressureAtEVO,
     knockIntegral,
+    peakEndGasTemp: peakEndGasTemp || T,
     wallHeat,
     meanHeatFlux,
     endState: {
@@ -603,7 +625,11 @@ export function solveOperatingPoint(
     ambient,
     fuelSystem: {
       ...cfgInput.fuelSystem,
+      // Soguk motor zenginlestirmesi HER IKI hedefe de uygulanir; yalnizca
+      // kismi yuk hedefini kaydirmak, soguk motorda tam gaz karisimini
+      // oldugundan fakir birakirdi.
       targetLambda: cfgInput.fuelSystem.targetLambda * thermal.lambdaMultiplier,
+      targetLambdaWOT: cfgInput.fuelSystem.targetLambdaWOT * thermal.lambdaMultiplier,
     },
   };
 
@@ -642,8 +668,27 @@ export function solveOperatingPoint(
   let spark = cfg.ignition.autoMBT ? 25 : cfg.ignition.fixedAdvance;
   let mbtAdvance = spark;
   let knockRetard = 0;
+  /**
+   * Vurunti yuzunden kesilen basinc orani (1 = kesinti yok).
+   *
+   * Gercek bir ECU'nun vuruntuya karsi IKI kozu vardir ve sirasi
+   * bellidir: once ateslemeyi geri ceker, o da yetmezse BASINCI KESER
+   * (wastegate'i acar). Ikinci koz modelde yoktu; bu yuzden hizli yanan,
+   * MBT'si zaten dusuk olan modern motorlar (kucuk cap + yuksek turbulans
+   * = MBT 8-10°) geri cekecek yer bulamayip cozumsuz kaliyordu. Oysa
+   * gercekte o motorlar basinc dusurerek kendilerini korur.
+   *
+   * Bu yalnizca bir "duzeltme" degil, ogretici de: dusuk oktan yakit
+   * koydugunda ya da basinci fazla actiginda model artik "vurunti var"
+   * demekle kalmiyor, GUCUN NE KADAR DUSTUGUNU de gosteriyor.
+   */
+  let boostTrim = 1;
+  let needIgnitionResearch = false;
 
-  for (let outer = 0; outer < 6; outer++) {
+  // Iterasyon sayisi, basinc kesme adimlarina da yer birakmalidir:
+  // trim 1.00'dan 0.35'e 0.08'lik adimlarla inerse 8 adim gerekir ve
+  // her adim bir dis iterasyon harcar.
+  for (let outer = 0; outer < 16; outer++) {
     // 1) Sinir kosullarini guncelle
     //
     // Turbo motorlarda spool devri A/R oranindan, turbo ataletinden ve
@@ -654,7 +699,15 @@ export function solveOperatingPoint(
       cfg.induction.turboInertia, manifold,
     );
     const boost = computeBoost(
-      { ...cfg.induction, fullBoostRpm: spoolRpm }, ambient, rpm, maf,
+      {
+        ...cfg.induction,
+        fullBoostRpm: spoolRpm,
+        // Vurunti kontrol edilemiyorsa wastegate acilir
+        targetBoost: cfg.induction.targetBoost * boostTrim,
+        boostLimit: ambient.pressure +
+          (cfg.induction.boostLimit - ambient.pressure) * boostTrim,
+      },
+      ambient, rpm, maf,
     );
     map = boost.map;
     superchargerPower = boost.compressorPower;
@@ -674,9 +727,16 @@ export function solveOperatingPoint(
       iat = boost.iat;
     }
 
-    // Yakit buharlasmasi dolguyu sogutur
+    // Yakit buharlasmasi dolguyu sogutur.
+    //
+    // GERCEKTE YANAN karisim kullanilir, kismi yuk hedefi degil: tam yukte
+    // ECU zenginlestirir, fazla yakit buharlasirken dolgudan gizli isi
+    // ceker ve son gaz sicakligini dusurur. Turbo motorlarda vuruntuyu
+    // bastirmanin birincil mekanizmasi budur. lambdaActual pompa
+    // yetersizligini de icerir; pompa yetisemeyip karisim fakirlesirse
+    // sogutma da azalir ve vurunti riski hakli olarak yukselir.
     const cooling = chargeCoolingDrop(
-      cfg.fuel, cfg.fuel.afrStoich * cfg.fuelSystem.targetLambda, 1010,
+      cfg.fuel, cfg.fuel.afrStoich * lambdaActual, 1010,
       cfg.fuelSystem.injection === 'DIRECT',
     );
     iatEffective = Math.max(iat - cooling, 200);
@@ -710,10 +770,20 @@ export function solveOperatingPoint(
     );
     const ramFactor = tuningVEMultiplier(rpm, tunedRpm, 0.12);
 
+    // ECU'nun bu yukte KOMUT ETTIGI lambda. Manifold basincina bagli
+    // oldugu icin dis dongude, MAP oturduktan sonra hesaplanir.
+    // Tam yuk zenginlestirmesi vuruntuyu bastirmanin birincil aracidir;
+    // bunu atlamak turbo motorlari olduklarindan cok daha vuruntulu
+    // gosterirdi.
+    const lambdaCommand = commandedLambda(
+      cfg.fuelSystem.targetLambda, cfg.fuelSystem.targetLambdaWOT,
+      map, ambient.pressure, cfg.ignition.boostEnrichment,
+    );
+
     // Yakit beslemesi: pompa talebi karsilayamazsa ray basinci duser,
     // enjektorler daha az yakit verir ve karisim ISTENMEDEN fakirlesir.
     // Bu geri besleme olmadan pompa darbogazi hicbir sey degistirmez.
-    const afrTarget = cfg.fuel.afrStoich * cfg.fuelSystem.targetLambda;
+    const afrTarget = cfg.fuel.afrStoich * lambdaCommand;
     const railG = cfg.fuelSystem.railPressure +
       (cfg.induction.type !== 'NA' ? Math.max(map - ambient.pressure, 0) : 0);
     const supplyEst = solveFuelSupply(
@@ -722,7 +792,7 @@ export function solveOperatingPoint(
       cfg.fuelSystem.pumpDeadheadPressure,
     );
     lambdaActual = clamp(
-      cfg.fuelSystem.targetLambda / Math.max(supplyEst.leanoutFactor, 0.35),
+      lambdaCommand / Math.max(supplyEst.leanoutFactor, 0.35),
       0.55, 1.45,
     );
 
@@ -744,7 +814,8 @@ export function solveOperatingPoint(
 
     // 2) Atesleme avansini bul. Sinir kosullari oturduktan sonra bir kez
     //    daha aranir; her dis iterasyonda tekrarlamak gereksiz pahali.
-    if (outer === 0 || (outer === 2 && o.ignitionPasses > 1)) {
+    if (outer === 0 || needIgnitionResearch || (outer === 2 && o.ignitionPasses > 1)) {
+      needIgnitionResearch = false;
       mbtAdvance = findMBT(cfg, k, rpm, bc, state, o);
       spark = cfg.ignition.autoMBT ? mbtAdvance : cfg.ignition.fixedAdvance;
 
@@ -802,10 +873,33 @@ export function solveOperatingPoint(
       Math.abs(newMaf - maf) / Math.max(newMaf, 1e-9) < 5e-3 &&
       Math.abs(newEgt - egt) / Math.max(newEgt, 1) < 5e-3;
 
-    // Yumusatilmis guncelleme — salinimi onler
+    // Yumusatilmis guncelleme — salinimi onler.
+    // Basinc kesme kontrolunden ONCE yapilir: aksi halde kesme adiminda
+    // "continue" edildiginde sinir kosullari hic guncellenmez ve dongu
+    // hicbir zaman yakinsamaz.
     maf = maf + 0.6 * (newMaf - maf);
     egt = egt + 0.6 * (newEgt - egt);
     walls = newWalls;
+
+    // --- Ikinci koz: basinc kesme ---
+    //
+    // Atesleme geri cekme yetkisi tukendigi HALDE vurunti devam ediyorsa
+    // wastegate acilir. "Yetki tukendi" iki turlu olur: ya izin verilen
+    // maksimum rotara ulasildi, ya da avans fiziksel tabana (1° BTDC)
+    // dayandi — hizli yanan motorlarda ikincisi once gelir.
+    const knockUncontrolled =
+      cycle.knockIntegral > cfg.ignition.knockThreshold * 1.02 &&
+      (knockRetard >= cfg.ignition.maxRetard - 0.5 || spark <= 1.5);
+    if (
+      cfg.induction.type !== 'NA' &&
+      knockUncontrolled &&
+      boostTrim > 0.36 &&
+      map > ambient.pressure * 1.02
+    ) {
+      boostTrim = Math.max(boostTrim - 0.08, 0.35);
+      needIgnitionResearch = true;
+      continue; // basinc degisti; sinir kosullari bastan otursun
+    }
 
     if (converged && outer >= 2) break;
   }
@@ -835,14 +929,28 @@ export function solveOperatingPoint(
   // icinde celiskili bir sonuc dogurur. Burada NIHAI kosullarla son bir
   // kez kontrol edip gerekirse avansi kirpiyoruz.
   {
+    // MUTLAK AVANS TABANI.
+    //
+    // Bu taban olmadan dongu avansi TDC'nin otesine, negatif degerlere
+    // itebiliyordu (olculdu: B58'de −3.8°, yani ust olu noktadan SONRA
+    // atesleme). Benzinli bir motor tam gazda boyle calismaz; ECU
+    // vuruntuyu bastiramasa bile ateslemeyi TDC sonrasina goturmez,
+    // basinci keser veya yakiti zenginlestirir.
+    //
+    // Ikili arama zaten bu tabani kullaniyordu (floor = max(spark −
+    // maxRetard, 1)); son duzeltme dongusu onu tanimadigi icin 12 × 0.4°
+    // daha asagi inebiliyordu.
+    const SPARK_FLOOR = 1;
     let guard = 0;
     while (
       cycle.knockIntegral > cfg.ignition.knockThreshold &&
       knockRetard < cfg.ignition.maxRetard &&
+      spark > SPARK_FLOOR &&
       guard++ < 12
     ) {
-      spark -= 0.4;
-      knockRetard += 0.4;
+      const next = Math.max(spark - 0.4, SPARK_FLOOR);
+      knockRetard += spark - next;
+      spark = next;
       cycle = convergeCycle(cfg, k, rpm, spark, finalBC, state, o);
     }
   }
@@ -971,7 +1079,41 @@ export function solveOperatingPoint(
   const dcr = dynamicCompressionRatio(k, ivcCycleAngle(cfg.valvetrain) - 720);
 
   // ============ UYARILAR ============
-  const knockRisk = clamp(cycle.knockIntegral / Math.max(cfg.ignition.knockThreshold, 1e-6), 0, 1.5);
+  //
+  // VURUNTI RISKI — ne olctugu onemli.
+  //
+  // Onceki tanim (integral / esik) yaniltiyordu: cozucu avansi ikili
+  // aramayla TAM esige oturttugu icin, vuruntu sinirinda calisan HER
+  // motor tanimi geregi 1.00 gosteriyordu. Yani dogru sekilde rotar
+  // uygulanmis, tamamen saglikli bir fabrika motoru "vurunti tehlikesi"
+  // uyarisi veriyordu. Fabrika avansi zaten vurunti sinirinda secilir;
+  // tam gazda dusuk devirde birkac derece avans cekmek her uretim
+  // motorunun normal davranisidir, ariza degildir.
+  //
+  // Yeni tanim, motorun vuruntuya karsi ELINDEKI SAVUNMA PAYININ ne
+  // kadarini tukettigini olcer:
+  //
+  //   0.00        MBT'de, sinirlama yok, integral esigin cok altinda
+  //   0.50        Tam kalibrasyon sinirinda (fabrika motoru icin NORMAL)
+  //   0.50-1.00   Sinirli; rotar yetkisinin bu kadarlik kismi tukendi
+  //   > 1.00      Yetki bitti, hala esigin ustunde — GERCEK detonasyon
+  //
+  // Boylece "vurunti sinirlayicisi calisiyor" (normal) ile "vurunti
+  // kontrol edilemiyor" (tehlike) birbirinden ayrilir. Sinirin iki
+  // yaninda deger sureklidir: sinirlanmamis motor esige yaklastikca
+  // 0.50'ye cikar, yeni sinirlanmis motor da 0.50'den baslar.
+  const knockProximity = cycle.knockIntegral / Math.max(cfg.ignition.knockThreshold, 1e-6);
+  const retardAuthority = cfg.ignition.maxRetard > 0.1
+    ? clamp(knockRetard / cfg.ignition.maxRetard, 0, 1)
+    : 0;
+  // Rotar yetkisi tukendigi halde integral hala esigin ustundeyse asim
+  const knockOvershoot = Math.max(knockProximity - 1, 0);
+  const knockRisk = clamp(
+    knockRetard > 0.05
+      ? Math.max(retardAuthority, 0.5) + knockOvershoot
+      : 0.5 * clamp(knockProximity, 0, 1),
+    0, 1.5,
+  );
   if (knockRisk > 0.95) {
     warnings.push({ severity: 'danger', key: 'knockImminent', params: { rpm } });
   } else if (knockRisk > 0.7) {
@@ -1129,6 +1271,8 @@ export function solveOperatingPoint(
     mbtAdvance,
     knockRetard,
     knockRisk,
+    endGasTemp: cycle.peakEndGasTemp,
+    knockBoostCut: (cfg.induction.targetBoost * (1 - boostTrim)) / 1e5,
     imep: imepNet,
     bmep,
     fmep,

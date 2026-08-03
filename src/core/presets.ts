@@ -67,6 +67,19 @@ interface PresetSpec {
   boost?: number;
   /** turbo tam basinca ulastigi devir */
   fullBoostRpm?: number;
+  /**
+   * Intercooler etkinligi (0-1). Verilmezse cage gore secilir.
+   *
+   * Bu deger vurunti payini dogrudan belirler ve motorlar arasinda
+   * gercekten cok farklidir — hepsine ayni degeri vermek, modern
+   * su-hava intercooler'li bir motoru 1990'larin ust montaj
+   * intercooler'i kadar kotu gosterir:
+   *
+   *   0.86-0.90  Modern OEM su-hava (B58, EA888 Gen3)
+   *   0.72-0.78  Iyi boyutlandirilmis on montaj hava-hava (Barra, RB26)
+   *   0.62-0.68  Ust montaj hava-hava — isi emmesiyle bilinir (EJ257)
+   */
+  intercooler?: number;
   /** mm — emme runner uzunlugu */
   runnerLength: number;
   /** mm — emme runner capi */
@@ -95,7 +108,7 @@ const PRESET_SPECS: PresetSpec[] = [
     valvetrain: 'DOHC', intakeValvesPerCyl: 2, exhaustValvesPerCyl: 2,
     intakeValveDia: 34.0, exhaustValveDia: 29.5, lift: 8.7, duration: 236, lsa: 113,
     redline: 7000, idleRpm: 750,
-    induction: 'TURBO', boost: 0.75, fullBoostRpm: 3600,
+    induction: 'TURBO', boost: 0.75, fullBoostRpm: 3600, intercooler: 0.72,  // on montaj hava-hava, iyi boyutlandirilmis
     runnerLength: 300, runnerDiameter: 45,
     injector: 550, pistonMass: 420, rodMass: 640,
     note: 'Efsanevi demir blok. Cok saglam alt takim, yuksek basinca dayanir.',
@@ -137,7 +150,7 @@ const PRESET_SPECS: PresetSpec[] = [
     valvetrain: 'DOHC', intakeValvesPerCyl: 2, exhaustValvesPerCyl: 2,
     intakeValveDia: 37.0, exhaustValveDia: 32.0, lift: 10.2, duration: 248, lsa: 110,
     redline: 6700, idleRpm: 800,
-    induction: 'TURBO', boost: 1.0, fullBoostRpm: 3400,
+    induction: 'TURBO', boost: 1.0, fullBoostRpm: 3400, intercooler: 0.64,  // ust montaj — isi emmesiyle bilinir
     runnerLength: 320, runnerDiameter: 44,
     injector: 550, pistonMass: 480, rodMass: 600,
     note: 'Kisa strok, buyuk cap. Boxer dizilim, dusuk agirlik merkezi.',
@@ -151,7 +164,7 @@ const PRESET_SPECS: PresetSpec[] = [
     valvetrain: 'DOHC', intakeValvesPerCyl: 2, exhaustValvesPerCyl: 2,
     intakeValveDia: 31.5, exhaustValveDia: 28.0, lift: 9.9, duration: 252, lsa: 108,
     redline: 7000, idleRpm: 700,
-    induction: 'TURBO', boost: 1.05, fullBoostRpm: 2200,
+    induction: 'TURBO', boost: 1.05, fullBoostRpm: 2200, intercooler: 0.88,  // modern OEM su-hava
     runnerLength: 270, runnerDiameter: 40,
     injector: 620, pistonMass: 340, rodMass: 520,
     note: 'Modern direkt enjeksiyon, yuksek CR + turbo. Genis tork plaformu.',
@@ -165,7 +178,7 @@ const PRESET_SPECS: PresetSpec[] = [
     valvetrain: 'DOHC', intakeValvesPerCyl: 2, exhaustValvesPerCyl: 2,
     intakeValveDia: 34.5, exhaustValveDia: 30.0, lift: 8.6, duration: 240, lsa: 114,
     redline: 8000, idleRpm: 850,
-    induction: 'TURBO', boost: 0.7, fullBoostRpm: 3800,
+    induction: 'TURBO', boost: 0.7, fullBoostRpm: 3800, intercooler: 0.74,  // buyuk on montaj hava-hava
     runnerLength: 230, runnerDiameter: 45,
     injector: 444, pistonMass: 400, rodMass: 570,
     note: 'Cok kisa strok — yuksek devire cok musait. Alti ayri kelebek.',
@@ -193,7 +206,7 @@ const PRESET_SPECS: PresetSpec[] = [
     valvetrain: 'DOHC', intakeValvesPerCyl: 2, exhaustValvesPerCyl: 2,
     intakeValveDia: 35.0, exhaustValveDia: 30.0, lift: 9.0, duration: 244, lsa: 114,
     redline: 6500, idleRpm: 700,
-    induction: 'TURBO', boost: 0.9, fullBoostRpm: 3000,
+    induction: 'TURBO', boost: 0.9, fullBoostRpm: 3000, intercooler: 0.76,  // buyuk on montaj hava-hava
     runnerLength: 340, runnerDiameter: 47,
     injector: 630, pistonMass: 460, rodMass: 700,
     note: 'Uzun strok, buyuk hacim turbo alti. Dusuk devirde muazzam tork.',
@@ -207,7 +220,7 @@ const PRESET_SPECS: PresetSpec[] = [
     valvetrain: 'DOHC', intakeValvesPerCyl: 2, exhaustValvesPerCyl: 2,
     intakeValveDia: 33.0, exhaustValveDia: 28.0, lift: 10.0, duration: 246, lsa: 110,
     redline: 6800, idleRpm: 750,
-    induction: 'TURBO', boost: 1.0, fullBoostRpm: 2400,
+    induction: 'TURBO', boost: 1.0, fullBoostRpm: 2400, intercooler: 0.86,  // modern OEM su-hava
     runnerLength: 280, runnerDiameter: 40,
     injector: 520, pistonMass: 330, rodMass: 500,
     note: 'Yaygin modern turbo dortlu. Direkt enjeksiyon.',
@@ -336,7 +349,7 @@ function buildEngine(s: PresetSpec): EngineConfig {
     type: s.induction,
     targetBoost: (s.boost ?? 0) * 1e5,
     compressorEfficiency: 0.72,
-    intercoolerEfficiency: boosted ? 0.72 : 0,
+    intercoolerEfficiency: boosted ? (s.intercooler ?? 0.72) : 0,
     fullBoostRpm: s.fullBoostRpm ?? 3000,
     boostLimit: 101325 + (s.boost ?? 0) * 1e5 * 1.15,
     runnerLength: s.runnerLength / 1000,
@@ -351,7 +364,23 @@ function buildEngine(s: PresetSpec): EngineConfig {
     compressorWheelDia: wheelDia,
     turboInertia,
     compressorPeakPR: Math.max((targetMap / 101325) * 0.92, 1.3),
-    compressorPeakFlow: Math.max(estPeakFlow * 0.85, 0.02),
+    // Kompresor adasinin merkezi, motorun CALISMA CIZGISINE oturmalidir.
+    //
+    // Bir turbo motor tam basinca ulastigi devirden kirmizi cizgiye kadar
+    // kabaca devirle orantili debi gecirir. Yani calisma cizgisi
+    // (fullBoostRpm/redline)·tepe debi ile tepe debi arasindadir; adanin
+    // merkezi bu araligin geometrik ortasina konur.
+    //
+    // Bunun fiziksel karsiligi sudur: ERKEN basinc yapan turbo KUCUK
+    // turbodur, adasi da dusuk debidedir. Onceki sabit 0.85 katsayisi
+    // adayi her motorda tepe debiye yakin koyuyordu; erken spool eden
+    // modern motorlar (B58 2200 rpm'de tam basinc) dusuk devirde adanin
+    // cok solunda kaliyor, verim %28 tabanina cakiliyor ve kompresor
+    // havayi 85 °C'ye kadar isitiyordu. Vuruntunun asil sebebi buydu.
+    compressorPeakFlow: Math.max(
+      estPeakFlow * Math.min(Math.max(Math.sqrt((s.fullBoostRpm ?? 3000) / s.redline), 0.45), 0.85),
+      0.02,
+    ),
     compressorPeakEff: 0.77,
   };
 
@@ -376,10 +405,20 @@ function buildEngine(s: PresetSpec): EngineConfig {
   const ignition: Ignition = {
     autoMBT: true,
     fixedAdvance: 20,
-    maxRetard: 14,
+    // Rotar yetkisi. Gercek ECU'lar atmosferik motorlarda 12-16°,
+    // asiri doldurulmus motorlarda 20-26° cekebilir; turbo motorda
+    // vurunti riski cok daha genis bir yelpazeye yayildigi icin
+    // kontrol unitesine daha genis yetki verilir.
+    maxRetard: boosted ? 24 : 16,
     dwellTime: 0.0032,
     sparkEnergy: 60,
     knockThreshold: 1.0,
+    // Kalibrasyon carpanlari — 1.0 = kalibre edilmis varsayilan davranis
+    knockScale: 1,
+    knockTempFactor: 1,
+    knockBoostFactor: 1,
+    knockLambdaFactor: 1,
+    boostEnrichment: boosted ? 0.055 : 0.03,
   };
 
   // Atalet: krank kutlesi hacimle, volan uygulama tipiyle olceklenir
