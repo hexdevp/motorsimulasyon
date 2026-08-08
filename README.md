@@ -8,7 +8,7 @@
 
 Kurulum yok, hesap yok, sunucu yok. Aç ve kullan.
 
-![Lisans](https://img.shields.io/badge/test-190%20ge%C3%A7iyor-brightgreen)
+![Lisans](https://img.shields.io/badge/test-204%20ge%C3%A7iyor-brightgreen)
 ![Fizik](https://img.shields.io/badge/%C3%A7%C3%B6z%C3%BCc%C3%BC-0D%20krank%20a%C3%A7%C4%B1s%C4%B1-blue)
 ![Boyut](https://img.shields.io/badge/tek%20dosya-364%20KB-lightgrey)
 ![Dil](https://img.shields.io/badge/dil-TR%20%2F%20EN-informational)
@@ -267,6 +267,12 @@ ayarlanabilir; elde ölçülmüş bir motora uydurmak için.
 **Turbo**
 - Gerçek kompresör verim adası (basınç oranı × düzeltilmiş debi), surge ve
   choke sınırları
+- **Kompresör debi kapasitesi** — sabit geometrili bir turbo hedef basıncı her
+  devirde sağlayamaz. Devir yükseldikçe motorun çektiği debi artar; kompresör
+  tıkanma hattına dayandığında basınç düşer. Stok turbo motorların gücünün
+  kırmızı çizgide değil ondan **önce** tepe yapmasının sebebi budur. Kapasite
+  katsayısı altı turbo motorun fabrika tepe güç devrine karşı kalibre edilmiştir
+  (`npx tsx test/turbo-cal.ts`, RMS %6.9)
 - Çark uç hızı ve şaft gerilme sınırı, turbo devri
 - Şaft ataletinden spool kayması (atalet çark çapının 5. kuvvetiyle artar)
 - Türbin A/R oranı: küçük → hızlı spool + yüksek karşı basınç
@@ -280,11 +286,14 @@ ayarlanabilir; elde ölçülmüş bir motora uydurmak için.
 
 ## Doğruluk — dürüst değerlendirme
 
-| Motor | Model tork | Gerçek | Model güç | Gerçek |
-|---|---|---|---|---|
-| Chevrolet LS3 | 565 N·m | 570 N·m | 385 HP | 430 HP |
-| Honda K20A | 188 N·m | 202 N·m | 163 HP | 220 HP |
-| Toyota 2JZ-GTE | 508 N·m | 441 N·m | 411 HP | ~320 HP |
+| Motor | Model tork | Gerçek | Model güç | Gerçek | Model tepe dev. | Gerçek |
+|---|---|---|---|---|---|---|
+| Chevrolet LS3 | 587 N·m | 570 N·m | 384 HP | 430 HP | 5750 | 5900 |
+| Honda K20A | 201 N·m | 202 N·m | 161 HP | 220 HP | 8600 | 8000 |
+| Toyota 2JZ-GTE | 493 N·m | 441 N·m | 333 HP | 320 HP | 6000 | 5600 |
+| Subaru EJ257 | 457 N·m | 393 N·m | 303 HP | 305 HP | 6700 | 6000 |
+| Nissan RB26DETT | 417 N·m | 368 N·m | 319 HP | 276 HP | 6750 | 6800 |
+| Dodge Viper V10 | 803 N·m | 814 N·m | 507 HP | 645 HP | 5750 | 6200 |
 
 **Güvenilir olan:** eğrilerin şekli, parametre değişimlerinin yönü ve
 büyüklüğü, motorlar arası karşılaştırma. Kam süresini artırdığınızda düşük devir
@@ -335,7 +344,7 @@ src/core/           Fizik çekirdeği — arayüzden tamamen bağımsız
   presets.ts          Motor kütüphanesi
 
 src/ui/             React arayüzü (çizim, ses, paneller)
-test/               190 test
+test/               204 test
 ```
 
 Çekirdek, arayüzden hiçbir şey import etmez. `src/core`'u alıp Node.js'te, bir
@@ -354,7 +363,7 @@ bir hesaptan gelir; kaynağı yorumda belirtilmiştir. Havanın 300 K'deki
 cp'sinden Wiebe eğrisinin karakteristik noktalarına, tıkanık akışın analitik
 çözümünden zengin karışımın termodinamik verim tavanına kadar.
 
-**42 vuruntu testi** — 12 stok motorun hiçbiri fabrika ayarında uyarı
+**56 vuruntu ve turbo testi** — 12 stok motorun hiçbiri fabrika ayarında uyarı
 vermemeli; düşük oktan / yüksek basınç / fakir karışım vuruntuyu artırmalı,
 zengin karışım ve iyi intercooler azaltmalı; rötar yetkisi tükendiğinde ECU
 basıncı kesmeli; avans hiçbir koşulda TDC sonrasına geçmemeli.
@@ -433,5 +442,5 @@ keyboard.
 ```bash
 npm install && npm run dev     # develop
 npm run build                  # → dist/index.html, a single self-contained file
-npm test                       # 190 tests
+npm test                       # 204 tests
 ```

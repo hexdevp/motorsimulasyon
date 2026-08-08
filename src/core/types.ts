@@ -155,6 +155,24 @@ export interface Induction {
   compressorPeakPR: number;
   /** Verim adasinin merkezindeki duzeltilmis debi (kg/s) */
   compressorPeakFlow: number;
+  /**
+   * Kompresorun gecirebilecegi EN YUKSEK duzeltilmis debi (kg/s).
+   *
+   * Verim adasindan AYRI bir sinirdir: turbo hala verimli calisiyor
+   * olabilir ama tikanma hattina dayandiginda basinci yukseltemez.
+   * Motorun cektigi debi bu degere yaklastikca asiri basinc duser —
+   * stok turbo motorlarda gucun kirmizi cizgiden ONCE tepe yapip
+   * inmesinin sebebi budur.
+   */
+  compressorMaxFlow: number;
+  /**
+   * Kapasite asildiginda basincin ne kadar SERT dustugu.
+   *
+   * Gercek kompresor haritalarinda tikanma hattina yaklasirken sabit
+   * devir cizgileri asagi kivrilir; kivrimin dikligi carka gore degisir.
+   * Buyuk deger = daha sert dusus = ust devirde daha erken tukenme.
+   */
+  compressorFalloff: number;
   /** Adanin tepe verimi (0-1) */
   compressorPeakEff: number;
 }

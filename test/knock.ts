@@ -256,5 +256,70 @@ console.log('\n=== SON GAZ SICAKLIGI ===');
     `son gaz ${p.endGasTemp.toFixed(0)} K < tepe ${p.peakTemperature.toFixed(0)} K`);
 }
 
+// ============================================================
+console.log('\n=== TURBO: GUC EGRISININ SEKLI ===');
+// ============================================================
+{
+  // ONCEKI HATA: computeBoost basinci yalnizca targetBoost×spool'dan
+  // hesapliyordu; massAirFlow parametresi turbo dalinda HIC
+  // kullanilmiyordu. Yani kompresore "bu debide bu basinci uretebilir
+  // misin?" diye sorulmuyordu ve basinc devir boyunca dumduz sabit
+  // kaliyordu. Sonuc: guc kirmizi cizgiye kadar tirmaniyordu
+  // (2JZ 361 HP @ 7000), oysa gercekte 5600'de tepe yapip iner.
+  const TURBOLAR = ['2jz-gte', 'ej257', 'rb26dett', 'b58', 'barra', 'ea888'];
+
+  // ESIKLER NEDEN BOYLE — durustce:
+  //
+  // Mekanizmanin kendisi (basincin ust devirde dusmesi) KATI olarak
+  // sinaniyor; alti motorun altisinda da calisiyor.
+  //
+  // "Guc ust devirde duser" kosulu ise +%3 toleransla sinaniyor, cunku
+  // model uc motorda (EJ257 +%2.1, EA888 +%1.6, B58 +%1.0) kirmizi
+  // cizgiye kadar hafifce tirmanmaya devam ediyor. Bu motorlarin
+  // gercek egrileri genis bir plato yapip son 300-500 devirde biraz
+  // duser; model o son dusuşu henuz yakalamiyor. KALAN BIR SAPMADIR,
+  // testi yesil gostermek icin gevsetilmemistir — asil hata cok daha
+  // buyuktu (basinc hic dusmuyor, guc kesiciye kadar tirmaniyordu) ve
+  // bu esik onu yakalar.
+  for (const id of TURBOLAR) {
+    const cfg = getPreset(id);
+    const res = runSweep(cfg);
+    const pts = res.points;
+    const last = pts[pts.length - 1];
+
+    // 1) MEKANIZMA: basinc ust devirde DUSMELI (kati)
+    const boostAtPeakTq = pts.find((p) => p.rpm >= res.peakTorque.rpm)!.map;
+    ok(`${cfg.name} — basınç üst devirde düşüyor`,
+      last.map < boostAtPeakTq * 0.985,
+      `${((boostAtPeakTq - 101325) / 1e5).toFixed(2)} -> ${((last.map - 101325) / 1e5).toFixed(2)} bar`);
+
+    // 2) Guc kirmizi cizgiye dogru DIK tirmanmamali
+    const lo = pts.find((p) => p.rpm >= cfg.redline * 0.85)!;
+    const climb = (last.power - lo.power) / lo.power;
+    ok(`${cfg.name} — güç kesiciye tırmanmıyor`, climb < 0.03,
+      `son %15 devirde ${(climb * 100).toFixed(1)}%`);
+  }
+}
+
+// ============================================================
+console.log('\n=== SESSIZ NaN KORUMASI ===');
+// ============================================================
+{
+  // clamp() NaN'i GECIRIR (NaN<lo ve NaN>hi ikisi de false). Bu yuzden
+  // gecersiz bir kalibrasyon degeri butun cevrimi sessizce NaN'a
+  // cevirebilir ve sonuclar MAKUL GORUNMEYE devam eder — kalibrasyon
+  // betiginde tam olarak bu oldu. Sonluluk kontrolu yerinde mi?
+  const bad = getPreset('2jz-gte');
+  (bad.induction as unknown as { compressorFalloff: unknown }).compressorFalloff = undefined;
+  const p = solveOperatingPoint(bad, 6500);
+  ok('Geçersiz falloff çevrimi NaN yapmıyor', Number.isFinite(p.power),
+    `guc ${p.power}`);
+
+  const good = solveOperatingPoint(getPreset('2jz-gte'), 6500);
+  ok('Geçersiz değer varsayılana düşüyor',
+    Math.abs(p.power - good.power) / good.power < 0.02,
+    `${(p.power / 745.7).toFixed(0)} vs ${(good.power / 745.7).toFixed(0)} HP`);
+}
+
 console.log(`\n${pass} gecti, ${fail} kaldi`);
 process.exit(fail ? 1 : 0);

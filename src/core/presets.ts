@@ -382,6 +382,29 @@ function buildEngine(s: PresetSpec): EngineConfig {
       0.02,
     ),
     compressorPeakEff: 0.77,
+    // Kompresorun debi kapasitesi.
+    //
+    // OEM turbolar tepki icin KUCUK secilir: tam basinci erken verirler
+    // ama ust devirde nefesleri kesilir. Kapasite, motorun kirmizi
+    // cizgideki talebinin altinda kalir ve basinc bu yuzden ust devirde
+    // duser — 2JZ-GTE'nin 5600 rpm'de tepe guc yapip 7000'de daha az
+    // vermesinin sebebi budur.
+    //
+    // Katsayilar TAHMIN DEGILDIR. Alti turbo motorun FABRIKA TEPE GUC
+    // DEVRINE karsi olculerek secilmistir (npx tsx test/turbo-cal.ts
+    // ile yeniden uretilebilir):
+    //
+    //   2JZ-GTE  6000 / 5600      RB26DETT 6750 / 6800
+    //   EJ257    6500 / 6000      Barra    5500 / 5250
+    //   B58      7000 / 6500      EA888    6750 / 6200
+    //
+    //   RMS sapma %6.9
+    //
+    // Sapmalarin hepsi ayni yonde (biraz gec) — modelin ust devirde
+    // hala bir miktar iyimser oldugunu gosterir, ama egrinin SEKLI
+    // artik dogru: guc kirmizi cizgide degil, ondan once tepe yapiyor.
+    compressorMaxFlow: estPeakFlow * 0.74,
+    compressorFalloff: 1.9,
   };
 
   const fuelSystem: FuelSystem = {

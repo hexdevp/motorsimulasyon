@@ -11,6 +11,7 @@
 
 import type { EngineConfig, Induction, Ambient } from './types';
 import { clamp } from './gas';
+import { correctedFlow } from './turbo';
 
 /** Ses hizi (m/s) */
 export function speedOfSound(tempK: number, gamma = 1.4, R = 287): number {
@@ -109,7 +110,38 @@ export function computeBoost(
       ? turboSpoolFraction(rpm, ind.fullBoostRpm, throttle)
       : Math.pow(throttle, 0.7); // supersarj: devirle dogrudan orantili, spool yok
 
-  const desiredBoost = ind.targetBoost * spool;
+  // ============================================================
+  // KOMPRESORUN DEBI KAPASITESI
+  //
+  // Sabit geometrili bir turbo, hedef basinci HER DEVIRDE saglayamaz.
+  // Devir yukseldikce motorun cektigi debi artar; kompresor tikanma
+  // (choke) hattina dayandiginda basinci daha fazla yukseltemez ve
+  // asiri basinc DUSMEYE baslar. Stok bir turbo motorun gucunun kirmizi
+  // cizgide degil, ondan once tepe yapip inmesinin sebebi tam olarak
+  // budur — 2JZ-GTE 5600 rpm'de tepe guc yapar, 7000'de daha azdir.
+  //
+  // Bu sinir olmadan basinc devir boyunca dumduz sabit kaliyor ve guc
+  // kesiciye kadar tirmaniyordu; egrinin SEKLI yanlis oluyordu.
+  //
+  // Debi kapasitesi verim adasindan AYRI bir fiziksel sinirdir: turbo
+  // hala verimli calisiyor olabilir ama gecirebilecegi kutle sinirlidir.
+  // Bu yuzden ayri bir parametre (compressorMaxFlow) olarak tutulur.
+  let capacityFactor = 1;
+  if (ind.type === 'TURBO' && ind.compressorMaxFlow > 0 && massAirFlow > 0) {
+    const corr = correctedFlow(massAirFlow, amb.temperature, amb.pressure);
+    // Kapasitenin %92'sine kadar sinirlama yok; sonrasinda basinc duser.
+    const knee = ind.compressorMaxFlow * 0.92;
+    if (corr > knee) {
+      const over = (corr - knee) / Math.max(knee, 1e-6);
+      // Sonluluk kontrolu: clamp() NaN'i GECIRIR (NaN<lo ve NaN>hi ikisi
+      // de false), dolayisiyla gecersiz bir falloff degeri butun cevrimi
+      // sessizce NaN'a cevirir ve sonuclar makul gorunmeye devam eder.
+      const fall = Number.isFinite(ind.compressorFalloff) ? ind.compressorFalloff : 1.9;
+      capacityFactor = clamp(1 - fall * over, 0.25, 1);
+    }
+  }
+
+  const desiredBoost = ind.targetBoost * spool * capacityFactor;
   let map = amb.pressure + desiredBoost;
   // Wastegate siniri
   map = Math.min(map, ind.boostLimit);
